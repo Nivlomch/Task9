@@ -1,4 +1,5 @@
 ---
+
 title: "Практическая работа #9: Асинхронное программирование в Dart"
 discipline: "Разработка мобильных приложений"
 tags:
@@ -12,6 +13,7 @@ tags:
     event-loop,
     flutter,
   ]
+
 ---
 
 # Практическая работа: Асинхронное программирование в Dart (Event Loop, Future, Stream, Isolates)
@@ -21,7 +23,7 @@ tags:
 
 ---
 
-## 📋 Содержание
+## Содержание
 
 1. [Модель параллелизма Dart: однопоточность и Event Loop](#1-модель-параллелизма-dart-однопоточность-и-event-loop)
 2. [Тема 1. Отложенные вычисления: Future API и синтаксис async/await](#тема-1-отложенные-вычисления-future-api-и-синтаксис-asyncawait)
@@ -38,7 +40,7 @@ tags:
 
 ### Архитектура цикла событий (Event Loop)
 
-```
+```text
                             СТАРТ ПРОГРАММЫ (main())
                                        │
                                        ▼
@@ -227,7 +229,6 @@ Future<bool> loginWithoutAsync(String user, String pass) {
 }
 ```
 
-
 ---
 
 ## Тема 2. Непрерывные потоки: Stream API и генераторы async\*
@@ -350,7 +351,6 @@ Stream<int> combinedStream() async* {
 }
 ```
 
-
 ---
 
 ## Тема 3. Реактивное управление: StreamController и StreamTransformer
@@ -360,7 +360,7 @@ Stream<int> combinedStream() async* {
 - **`Sink` (Входной порт):** Место, куда события отправляются (`sink.add()`, `sink.addError()`).
 - **`Stream` (Выходной порт):** Поток, на который подписываются клиенты для чтения данных.
 
-```
+```text
                            STREAM CONTROLLER
         ┌─────────────────────────────────────────────────────┐
         │                                                     │
@@ -488,7 +488,6 @@ void trackSubscribers() {
 }
 ```
 
-
 ---
 
 ## Тема 4. Истинная многопоточность: Изоляты (Isolates) и Isolate.run
@@ -503,7 +502,7 @@ void trackSubscribers() {
 - Нет блокировок, взаимных дедлоков и мьютексов.
 - Общение между изолятами происходит исключительно через передачу сообщений по системным портам (`SendPort` и `ReceivePort`), либо через метод `Isolate.run()` (начиная с Dart 2.19+).
 
-```
+```text
    MAIN ISOLATE (UI & Event Loop)             BACKGROUND WORKER ISOLATE
 ┌─────────────────────────────────┐       ┌─────────────────────────────────┐
 │ Своя изолированная память       │       │ Своя изолированная память       │
@@ -733,7 +732,6 @@ Future<void> killIsolate() async {
 }
 ```
 
-
 ---
 
 ## 50 Смешанных заданий по асинхронной разработке
@@ -757,7 +755,6 @@ Future<void> killIsolate() async {
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 
 Future<String> fetchData(String url) async {
   await Future.delayed(const Duration(milliseconds: 1200));
@@ -968,7 +965,6 @@ class Debouncer {
 }
 ```
 
-
 ### Блок 2: Потоковые данные, датчики и Stream API
 
 11. **Слушатель котировок криптовалют:** Смоделируйте WebSocket-поток, передающий случайную цену биткоина раз в 200 мс, и отфильтруйте всплески более 5%.
@@ -985,7 +981,6 @@ class Debouncer {
 ```dart
 import 'dart:async';
 import 'dart:math';
-
 
 Stream<double> bitcoinPrices() async* {
   final random = Random();
@@ -1173,7 +1168,6 @@ Future<void> getLastValue() async {
 }
 ```
 
-
 ### Блок 3: Реактивные шины событий и StreamController
 
 21. **Шина глобальных событий (EventBus):** Создайте синглтон `EventBus` на базе широковещательного `StreamController` для обмена событиями между несвязанными экранами.
@@ -1189,7 +1183,6 @@ Future<void> getLastValue() async {
 
 ```dart
 import 'dart:async';
-
 
 class EventBus {
   EventBus._();
@@ -1502,7 +1495,6 @@ class CrashLogger {
 }
 ```
 
-
 ### Блок 4: Изоляты и ресурсоемкие параллельные задачи
 
 31. **Фоновая генерация миниатюр (Thumbnail Generator):** Обработайте массив байтов изображения в `Isolate.run()`, изменив его размер и вернув сжатый массив.
@@ -1523,7 +1515,6 @@ import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
-
 
 Uint8List generateThumbnail(Uint8List imageBytes) {
   return Isolate.run(() {
@@ -1700,7 +1691,25 @@ String generateFinancialReport(Map<String, double> finances) {
   StringBuffer report = StringBuffer();
 
   report.writeln("Финансовый отчет за год");
-  report.writeln("------------------------");
+  report.writeln("
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+");
 
   finances.forEach((month, amount) {
     report.writeln("$month: $amount");
@@ -1711,7 +1720,25 @@ String generateFinancialReport(Map<String, double> finances) {
     (sum, value) => sum + value,
   );
 
-  report.writeln("------------------------");
+  report.writeln("
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+");
   report.writeln("Итого: $total");
 
   return report.toString();
@@ -1777,7 +1804,6 @@ Future<TransferableTypedData> transferLargeBuffer(
 }
 ```
 
-
 ### Блок 5: Сложные асинхронные архитектуры и отказоустойчивость
 
 41. **Отмена сетевой операции через CancelToken:** Реализуйте класс токена отмены, выбрасывающий `CancellationException` при прерывании пользователем ухода со страницы.
@@ -1794,7 +1820,6 @@ Future<TransferableTypedData> transferLargeBuffer(
     - Передайте расчет скользящей волатильности в параллельный изолят (`Isolate.run`).
     - Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
     - Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов `dispose()` для всех контроллеров и подписок.
-
 
 import 'dart:async';
 import 'dart:convert';
@@ -2021,7 +2046,6 @@ class Debouncer {
     Поток обратного отсчета для OTP-кода: Создайте стрим таймера на 60 секунд для экрана ввода SMS с уведомлением о завершении срока жизни кода.
     Потоковый калькулятор скользящего среднего: Спроектируйте стрим, принимающий числа и отдающий скользящее среднее значение последних 5 измерений.
     Преобразование Stream в Future: Извлеките последнее значение из конечного потока с помощью метода stream.last.
-
 
 import 'dart:async';
 import 'dart:math';
@@ -2551,7 +2575,6 @@ class CrashLogger {
     Конвертер аудио-семплов: Смоделируйте преобразование массива сырых аудио-семплов в изоляте.
     Безопасная передача больших объектов (TransferableTypedData): Передайте большой бинарный буфер между изолятами без затратного копирования памяти.
 
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -2736,7 +2759,25 @@ String generateFinancialReport(Map<String, double> finances) {
   StringBuffer report = StringBuffer();
 
   report.writeln("Финансовый отчет за год");
-  report.writeln("------------------------");
+  report.writeln("
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+");
 
   finances.forEach((month, amount) {
     report.writeln("$month: $amount");
@@ -2747,7 +2788,25 @@ String generateFinancialReport(Map<String, double> finances) {
     (sum, value) => sum + value,
   );
 
-  report.writeln("------------------------");
+  report.writeln("
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
+
+");
   report.writeln("Итого: $total");
 
   return report.toString();
@@ -2828,7 +2887,6 @@ Future<TransferableTypedData> transferLargeBuffer(
         Передайте расчет скользящей волатильности в параллельный изолят (Isolate.run).
         Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
         Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов dispose() для всех контроллеров и подписок.
-
 
 import 'dart:async';
 import 'dart:math';
