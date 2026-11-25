@@ -1,4 +1,3 @@
-# Task9
 ---
 title: "Практическая работа #9: Асинхронное программирование в Dart"
 discipline: "Разработка мобильных приложений"
@@ -1796,12 +1795,1047 @@ Future<TransferableTypedData> transferLargeBuffer(
     - Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
     - Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов `dispose()` для всех контроллеров и подписок.
 
-```dart
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+// Блок 1. Сетевые запросы, таймеры и Future
+
+Future<String> fetchData(String url) async {
+  await Future.delayed(const Duration(milliseconds: 1200));
+
+  int statusCode = 200;
+
+  if (url.contains("404")) {
+    statusCode = 404;
+  } else if (url.contains("500")) {
+    statusCode = 500;
+  }
+
+  if (statusCode == 200) {
+    return jsonEncode({
+      "status": 200,
+      "url": url,
+      "data": "Данные получены",
+    });
+  } else if (statusCode == 404) {
+    throw HttpException("Ошибка 404: Не найдено");
+  } else {
+    throw HttpException("Ошибка 500: Ошибка сервера");
+  }
+}
+
+Future<T> fetchWithRetry<T>(Future<T> Function() request) async {
+  int retryCount = 0;
+  List<int> delays = [1, 2, 4, 8];
+
+  while (true) {
+    try {
+      return await request();
+    } on SocketException {
+      if (retryCount >= delays.length) {
+        rethrow;
+      }
+
+      await Future.delayed(Duration(seconds: delays[retryCount]));
+      retryCount++;
+    }
+  }
+}
+
+Future<Map<String, String>> fetchImageMetadata() async {
+  List<String> urls = List.generate(
+    5,
+    (index) => "image_$index.jpg",
+  );
+
+  Map<String, String> results = {};
+  int index = 0;
+
+  Future<void> worker() async {
+    while (index < urls.length) {
+      String url = urls[index++];
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      results[url] = "Метаданные $url";
+    }
+  }
+
+  await Future.wait([
+    worker(),
+    worker(),
+  ]);
+
+  return results;
+}
+
+Future<String> pingMirror(String url, int milliseconds) async {
+  await Future.delayed(Duration(milliseconds: milliseconds));
+  return url;
+}
+
+Future<String> findFastestServer() {
+  return Future.any([
+    pingMirror("https://mirror1.com", 800),
+    pingMirror("https://mirror2.com", 1200),
+    pingMirror("https://mirror3.com", 1000),
+  ]);
+}
+
+class CancelToken {
+  bool isCancelled = false;
+
+  void cancel() {
+    isCancelled = true;
+  }
+}
+
+Future<void> saveProfile(CancelToken token) async {
+  for (int i = 0; i < 10; i++) {
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (token.isCancelled) {
+      throw Exception("Операция прервана");
+    }
+  }
+}
+
+Future<void> saveProfileWithTimeout() async {
+  final token = CancelToken();
+
+  try {
+    await Future.any([
+      saveProfile(token),
+      Future.delayed(const Duration(seconds: 3), () {
+        token.cancel();
+        throw TimeoutException("Превышено время сохранения профиля");
+      }),
+    ]);
+  } catch (e) {
+    print(e);
+  }
+}
+
+class AsyncQueue {
+  Future<void> _tail = Future.value();
+
+  Future<T> add<T>(Future<T> Function() task) {
+    final completer = Completer<T>();
+
+    _tail = _tail.then((_) async {
+      try {
+        completer.complete(await task());
+      } catch (e, stackTrace) {
+        completer.completeError(e, stackTrace);
+      }
+    });
+
+    return completer.future;
+  }
+}
+
+Future<int> benchmark(Future Function() task) async {
+  Stopwatch stopwatch = Stopwatch()..start();
+
+  await task();
+
+  stopwatch.stop();
+
+  return stopwatch.elapsedMilliseconds;
+}
+
+class AppConfig {
+  final Map<String, dynamic> data;
+
+  AppConfig._(this.data);
+
+  static Future<AppConfig>? _instance;
+
+  static Future<AppConfig> getInstance() {
+    return _instance ??= _load();
+  }
+
+  static Future<AppConfig> _load() async {
+    await Future.delayed(const Duration(seconds: 1));
+
+    return AppConfig._({
+      "appName": "MyApplication",
+      "version": "1.0.0",
+    });
+  }
+}
+
+Future<String> readLocalDatabase() async {
+  await Future.delayed(const Duration(milliseconds: 200));
+  return "Локальные данные";
+}
+
+Future<String> fetchNetworkData() async {
+  await Future.delayed(const Duration(seconds: 1));
+  return "Сетевые данные";
+}
+
+Future<String> loadCache() async {
+  Future<String> localData = readLocalDatabase();
+
+  return fetchNetworkData().timeout(
+    const Duration(milliseconds: 300),
+    onTimeout: () => localData,
+  );
+}
+
+class Debouncer {
+  final Duration delay;
+  final void Function(String) onSearch;
+
+  Timer? _timer;
+
+  Debouncer({
+    required this.delay,
+    required this.onSearch,
+  });
+
+  void search(String query) {
+    _timer?.cancel();
+
+    _timer = Timer(delay, () {
+      onSearch(query);
+    });
+  }
+
+  void dispose() {
+    _timer?.cancel();
+  }
+}
+Блок 2: Потоковые данные, датчики и Stream API
+
+    Слушатель котировок криптовалют: Смоделируйте WebSocket-поток, передающий случайную цену биткоина раз в 200 мс, и отфильтруйте всплески более 5%.
+    Стриминг прогресса скачивания файла: Напишите асинхронный генератор async*, передающий процент загрузки от 0% до 100% с шагом в 10% каждые 300 мс.
+    Объединение двух потоков (Merge): Создайте функцию, объединяющую события из потока геолокации и потока компаса в единый поток навигации.
+    Дросселирование потока (Throttle): Реализуйте оператор, пропускающий не более одного клика по кнопке в секунду из непрерывного потока нажатий.
+    Поток шагов акселерометра: Сгенерируйте поток показаний ускорения по трем осям, подсчитывающий число шагов при превышении порогового значения.
+    Автоматическое переподключение потока (Reconnection): Напишите слушатель стрима чата, который при возникновении ошибки автоматически пересоздает подписку через 2 секунды.
+    Буферизация потока пачками (Buffer / Chunk): Накапливайте события кликов в список и отдавайте их пачками по 5 штук или раз в 3 секунды.
+    Поток обратного отсчета для OTP-кода: Создайте стрим таймера на 60 секунд для экрана ввода SMS с уведомлением о завершении срока жизни кода.
+    Потоковый калькулятор скользящего среднего: Спроектируйте стрим, принимающий числа и отдающий скользящее среднее значение последних 5 измерений.
+    Преобразование Stream в Future: Извлеките последнее значение из конечного потока с помощью метода stream.last.
+
+
+import 'dart:async';
+import 'dart:math';
+
+// Блок 2. Потоковые данные, датчики и Stream API
+
+Stream<double> bitcoinPrices() async* {
+  final random = Random();
+  double price = 90000;
+
+  while (true) {
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    price += (random.nextDouble() - 0.5) * 1000;
+
+    yield price;
+  }
+}
+
+Stream<double> filterPriceSpikes(Stream<double> stream) async* {
+  double? previousPrice;
+
+  await for (final price in stream) {
+    if (previousPrice == null ||
+        ((price - previousPrice).abs() / previousPrice) <= 0.05) {
+      yield price;
+    }
+
+    previousPrice = price;
+  }
+}
+
+Stream<int> downloadProgress() async* {
+  for (int i = 0; i <= 100; i += 10) {
+    await Future.delayed(const Duration(milliseconds: 300));
+    yield i;
+  }
+}
+
+Stream<String> mergeNavigationStreams(
+  Stream<String> locationStream,
+  Stream<String> compassStream,
+) {
+  return StreamGroup.merge([
+    locationStream,
+    compassStream,
+  ]);
+}
+
+Stream<T> throttle<T>(Stream<T> stream) async* {
+  DateTime? lastEvent;
+
+  await for (final event in stream) {
+    DateTime now = DateTime.now();
+
+    if (lastEvent == null ||
+        now.difference(lastEvent).inMilliseconds >= 1000) {
+      lastEvent = now;
+      yield event;
+    }
+  }
+}
+
+Stream<(double, double, double)> accelerometer() async* {
+  final random = Random();
+
+  while (true) {
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    yield (
+      random.nextDouble() * 3,
+      random.nextDouble() * 3,
+      random.nextDouble() * 3,
+    );
+  }
+}
+
+Stream<int> countSteps(
+  Stream<(double, double, double)> stream,
+) async* {
+  int steps = 0;
+
+  await for (final acceleration in stream) {
+    double magnitude = sqrt(
+      acceleration.$1 * acceleration.$1 +
+          acceleration.$2 * acceleration.$2 +
+          acceleration.$3 * acceleration.$3,
+    );
+
+    if (magnitude > 2.5) {
+      steps++;
+      yield steps;
+    }
+  }
+}
+
+Stream<String> createChatStream() async* {
+  await Future.delayed(const Duration(seconds: 1));
+  yield "Новое сообщение";
+  throw Exception("Соединение потеряно");
+}
+
+void listenToChat() {
+  late StreamSubscription<String> subscription;
+
+  void connect() {
+    subscription = createChatStream().listen(
+      (message) => print(message),
+      onError: (error) async {
+        await Future.delayed(const Duration(seconds: 2));
+        connect();
+      },
+    );
+  }
+
+  connect();
+}
+
+Stream<List<T>> bufferClicks<T>(Stream<T> stream) async* {
+  final buffer = <T>[];
+  final controller = StreamController<List<T>>();
+
+  Timer? timer;
+
+  void flush() {
+    if (buffer.isNotEmpty) {
+      controller.add(List<T>.from(buffer));
+      buffer.clear();
+    }
+  }
+
+  timer = Timer.periodic(
+    const Duration(seconds: 3),
+    (_) => flush(),
+  );
+
+  final subscription = stream.listen(
+    (event) {
+      buffer.add(event);
+
+      if (buffer.length >= 5) {
+        flush();
+      }
+    },
+    onError: controller.addError,
+    onDone: () {
+      flush();
+      timer?.cancel();
+      controller.close();
+    },
+  );
+
+  yield* controller.stream;
+
+  await subscription.cancel();
+}
+
+Stream<int> otpCountdown() async* {
+  for (int i = 60; i >= 0; i--) {
+    await Future.delayed(const Duration(seconds: 1));
+    yield i;
+  }
+
+  print("Срок действия OTP-кода истек");
+}
+
+Stream<double> movingAverage(Stream<double> stream) async* {
+  final values = <double>[];
+
+  await for (final value in stream) {
+    values.add(value);
+
+    if (values.length > 5) {
+      values.removeAt(0);
+    }
+
+    double average =
+        values.reduce((a, b) => a + b) / values.length;
+
+    yield average;
+  }
+}
+
+Future<void> getLastValue() async {
+  Stream<int> stream = Stream.fromIterable([10, 20, 30, 40, 50]);
+
+  int lastValue = await stream.last;
+
+  print(lastValue);
+}
+лок 3: Реактивные шины событий и StreamController
+
+    Шина глобальных событий (EventBus): Создайте синглтон EventBus на базе широковещательного StreamController для обмена событиями между несвязанными экранами.
+    Реактивная корзина интернет-магазина: Реализуйте класс CartStore, транслирующий в стрим текущее количество товаров и итоговую сумму при вызовах add() и remove().
+    Счетчик непрочитанных сообщений: Спроектируйте контроллер бейджа уведомлений, увеличивающий счетчик при новых событиях и сбрасывающий его в ноль при прочтении.
+    Управление состоянием аудиоплеера: Реализуйте AudioPlayerBloc со стримом состояний: PlayerStopped, PlayerPlaying(track), PlayerPaused.
+    Контроллер бесконечной ленты (Pagination Stream): Спроектируйте стрим, подгружающий следующую страницу новостей при передаче события LoadNextPage.
+    Реактивный переключатель темной темы: Создайте менеджер темы приложения, отдающий ThemeMode.dark или ThemeMode.light через BehaviorSubject-подобный контроллер.
+    Слушатель сетевого статуса (Connectivity Stream): Контроллер, транслирующий изменения подключения (WiFi, Cellular, None) во все подписанные модули.
+    Защита контроллера от утечек памяти (Auto-Dispose): Напишите класс с механизмом проверки наличия подписчиков и автоматическим вызовом close() при обнулении слушателей.
+    Валидация формы регистрации на стримах: Создайте два потока для полей Email и Пароль, объедините их через Rx.combineLatest-подобную логику и отдавайте флаг активности кнопки isSubmitEnabled.
+    Потоковый логгер крашей: Направляйте все неотловленные ошибки приложения через StreamController в фоновый модуль отправки аналитики
+
+import 'dart:async';
+
+// Блок 3. Реактивные шины событий и StreamController
+
+class EventBus {
+  EventBus._();
+
+  static final EventBus instance = EventBus._();
+
+  final StreamController<Object> _controller =
+      StreamController<Object>.broadcast();
+
+  Stream<Object> get stream => _controller.stream;
+
+  void fire(Object event) {
+    _controller.sink.add(event);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+class CartState {
+  final int itemCount;
+  final double totalPrice;
+
+  CartState(this.itemCount, this.totalPrice);
+}
+
+class CartStore {
+  final StreamController<CartState> _controller =
+      StreamController<CartState>.broadcast();
+
+  final Map<String, double> _products = {};
+
+  Stream<CartState> get stream => _controller.stream;
+
+  void add(String name, double price) {
+    _products[name] = (_products[name] ?? 0) + price;
+    _update();
+  }
+
+  void remove(String name) {
+    _products.remove(name);
+    _update();
+  }
+
+  void _update() {
+    double total = _products.values.fold(0, (a, b) => a + b);
+
+    _controller.add(
+      CartState(_products.length, total),
+    );
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+class NotificationBadge {
+  final StreamController<int> _controller =
+      StreamController<int>.broadcast();
+
+  int _count = 0;
+
+  Stream<int> get stream => _controller.stream;
+
+  void increment() {
+    _count++;
+    _controller.add(_count);
+  }
+
+  void reset() {
+    _count = 0;
+    _controller.add(_count);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+abstract class PlayerState {}
+
+class PlayerStopped extends PlayerState {}
+
+class PlayerPlaying extends PlayerState {
+  final String track;
+
+  PlayerPlaying(this.track);
+}
+
+class PlayerPaused extends PlayerState {}
+
+class AudioPlayerBloc {
+  final StreamController<PlayerState> _controller =
+      StreamController<PlayerState>.broadcast();
+
+  Stream<PlayerState> get stream => _controller.stream;
+
+  void play(String track) {
+    _controller.add(PlayerPlaying(track));
+  }
+
+  void pause() {
+    _controller.add(PlayerPaused());
+  }
+
+  void stop() {
+    _controller.add(PlayerStopped());
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+class LoadNextPage {}
+
+class PaginationController {
+  final StreamController<LoadNextPage> _requestController =
+      StreamController<LoadNextPage>();
+
+  final StreamController<List<String>> _newsController =
+      StreamController<List<String>>.broadcast();
+
+  int _page = 0;
+
+  Stream<List<String>> get stream => _newsController.stream;
+
+  PaginationController() {
+    _requestController.stream.listen((event) async {
+      _page++;
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      _newsController.add([
+        "Новость $_page.1",
+        "Новость $_page.2",
+        "Новость $_page.3",
+      ]);
+    });
+  }
+
+  void loadNextPage() {
+    _requestController.add(LoadNextPage());
+  }
+
+  void dispose() {
+    _requestController.close();
+    _newsController.close();
+  }
+}
+
+enum ThemeMode {
+  dark,
+  light,
+}
+
+class ThemeManager {
+  final StreamController<ThemeMode> _controller =
+      StreamController<ThemeMode>.broadcast();
+
+  ThemeMode _theme = ThemeMode.light;
+
+  Stream<ThemeMode> get stream => _controller.stream;
+
+  ThemeMode get currentTheme => _theme;
+
+  void toggleTheme() {
+    _theme = _theme == ThemeMode.light
+        ? ThemeMode.dark
+        : ThemeMode.light;
+
+    _controller.add(_theme);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+enum ConnectivityStatus {
+  WiFi,
+  Cellular,
+  None,
+}
+
+class ConnectivityController {
+  final StreamController<ConnectivityStatus> _controller =
+      StreamController<ConnectivityStatus>.broadcast();
+
+  Stream<ConnectivityStatus> get stream => _controller.stream;
+
+  void updateStatus(ConnectivityStatus status) {
+    _controller.add(status);
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+class AutoDisposeController<T> {
+  late final StreamController<T> _controller;
+
+  int _listeners = 0;
+
+  AutoDisposeController() {
+    _controller = StreamController<T>(
+      onListen: () {
+        _listeners++;
+      },
+      onCancel: () {
+        _listeners--;
+
+        if (_listeners <= 0) {
+          close();
+        }
+      },
+    );
+  }
+
+  Stream<T> get stream => _controller.stream;
+
+  void add(T value) {
+    if (!_controller.isClosed) {
+      _controller.add(value);
+    }
+  }
+
+  void close() {
+    if (!_controller.isClosed) {
+      _controller.close();
+    }
+  }
+}
+
+class RegistrationController {
+  final StreamController<String> _emailController =
+      StreamController<String>.broadcast();
+
+  final StreamController<String> _passwordController =
+      StreamController<String>.broadcast();
+
+  final StreamController<bool> _submitController =
+      StreamController<bool>.broadcast();
+
+  String _email = "";
+  String _password = "";
+
+  Stream<bool> get isSubmitEnabled => _submitController.stream;
+
+  RegistrationController() {
+    _emailController.stream.listen((email) {
+      _email = email;
+      _validate();
+    });
+
+    _passwordController.stream.listen((password) {
+      _password = password;
+      _validate();
+    });
+  }
+
+  void updateEmail(String email) {
+    _emailController.add(email);
+  }
+
+  void updatePassword(String password) {
+    _passwordController.add(password);
+  }
+
+  void _validate() {
+    bool isValid = _email.contains("@") && _password.length >= 8;
+
+    _submitController.add(isValid);
+  }
+
+  void dispose() {
+    _emailController.close();
+    _passwordController.close();
+    _submitController.close();
+  }
+}
+
+class CrashLogger {
+  final StreamController<Object> _controller =
+      StreamController<Object>.broadcast();
+
+  Stream<Object> get stream => _controller.stream;
+
+  CrashLogger() {
+    stream.listen((error) {
+      sendAnalytics(error);
+    });
+  }
+
+  void logError(Object error) {
+    _controller.add(error);
+  }
+
+  Future<void> sendAnalytics(Object error) async {
+    await Future.delayed(const Duration(seconds: 1));
+    print("Ошибка отправлена в аналитику: $error");
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+Блок 4: Изоляты и ресурсоемкие параллельные задачи
+
+    Фоновая генерация миниатюр (Thumbnail Generator): Обработайте массив байтов изображения в Isolate.run(), изменив его размер и вернув сжатый массив.
+    Шифрование базы заметок: Выполните шифрование большого текстового файла по алгоритму XOR / AES в параллельном изоляте без просадки FPS.
+    Полнотекстовый поиск по 100 000 документов: Передайте поисковый запрос и список документов в фоновый изолят, вернув 10 наиболее релевантных совпадений.
+    Парсинг тяжелого GeoJSON карты города: Распарсите координаты полигонов районов города в фоновом потоке памяти и верните готовые структуры данных.
+    Сжатие логов в ZIP-архив: Смоделируйте упаковку текстовых журналов в сжатый архив через изолят перед отправкой в техподдержку.
+    Двусторонний пул воркеров (Worker Pool): Создайте менеджер из двух постоянно работающих изолятов, распределяющий между ними математические задачи.
+    Генерация PDF-отчета: Сформируйте текстовую структуру финансового отчета за год в параллельном изоляте.
+    Сортировка массива из 1 000 000 чисел: Сравните время сортировки массива в главном потоке и в отдельном изоляте.
+    Конвертер аудио-семплов: Смоделируйте преобразование массива сырых аудио-семплов в изоляте.
+    Безопасная передача больших объектов (TransferableTypedData): Передайте большой бинарный буфер между изолятами без затратного копирования памяти.
+
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:isolate';
+import 'dart:math';
+import 'dart:typed_data';
+import 'package:archive/archive.dart';
+
+// Блок 4. Изоляты и ресурсоемкие параллельные задачи
+
+Uint8List generateThumbnail(Uint8List imageBytes) {
+  return Isolate.run(() {
+    int newLength = imageBytes.length ~/ 4;
+
+    return Uint8List.fromList(
+      imageBytes.sublist(0, newLength),
+    );
+  }) as Uint8List;
+}
+
+Uint8List encryptNotes(String text) {
+  final bytes = utf8.encode(text);
+
+  return Uint8List.fromList(
+    bytes.map((byte) => byte ^ 123).toList(),
+  );
+}
+
+Future<Uint8List> encryptNotesInIsolate(String text) {
+  return Isolate.run(() => encryptNotes(text));
+}
+
+class SearchResult {
+  final String document;
+  final int relevance;
+
+  SearchResult(this.document, this.relevance);
+}
+
+List<SearchResult> searchDocuments(
+  List<String> documents,
+  String query,
+) {
+  List<SearchResult> results = [];
+
+  for (String document in documents) {
+    int relevance = query.allMatches(
+      document.toLowerCase(),
+    ).length;
+
+    if (relevance > 0) {
+      results.add(SearchResult(document, relevance));
+    }
+  }
+
+  results.sort(
+    (a, b) => b.relevance.compareTo(a.relevance),
+  );
+
+  return results.take(10).toList();
+}
+
+Future<List<SearchResult>> fullTextSearch(
+  List<String> documents,
+  String query,
+) {
+  return Isolate.run(
+    () => searchDocuments(documents, query),
+  );
+}
+
+List<List<List<double>>> parseGeoJson(String jsonString) {
+  final data = jsonDecode(jsonString);
+
+  List<List<List<double>>> polygons = [];
+
+  for (var feature in data['features']) {
+    var coordinates =
+        feature['geometry']['coordinates'];
+
+    for (var polygon in coordinates) {
+      List<List<double>> points = [];
+
+      for (var point in polygon) {
+        points.add([
+          point[0].toDouble(),
+          point[1].toDouble(),
+        ]);
+      }
+
+      polygons.add(points);
+    }
+  }
+
+  return polygons;
+}
+
+Future<List<List<List<double>>>> parseGeoJsonInIsolate(
+  String jsonString,
+) {
+  return Isolate.run(() => parseGeoJson(jsonString));
+}
+
+Future<List<int>> compressLogs(List<String> logs) {
+  return Isolate.run(() {
+    String text = logs.join('\n');
+    List<int> bytes = utf8.encode(text);
+
+    return GZipEncoder().encode(bytes);
+  });
+}
+
+void workerEntryPoint(SendPort mainPort) {
+  final receivePort = ReceivePort();
+
+  mainPort.send(receivePort.sendPort);
+
+  receivePort.listen((message) {
+    int id = message[0];
+    int number = message[1];
+    SendPort replyPort = message[2];
+
+    int result = number * number;
+
+    replyPort.send([id, result]);
+  });
+}
+
+class WorkerPool {
+  final List<SendPort> _workers = [];
+  final ReceivePort _receivePort = ReceivePort();
+
+  int _currentWorker = 0;
+  int _taskId = 0;
+
+  final Map<int, Completer<int>> _tasks = {};
+
+  Future<void> start() async {
+    _receivePort.listen((message) {
+      int id = message[0];
+      int result = message[1];
+
+      _tasks.remove(id)?.complete(result);
+    });
+
+    for (int i = 0; i < 2; i++) {
+      final port = ReceivePort();
+
+      await Isolate.spawn(
+        workerEntryPoint,
+        port.sendPort,
+      );
+
+      SendPort worker = await port.first as SendPort;
+
+      _workers.add(worker);
+    }
+  }
+
+  Future<int> execute(int number) {
+    int id = _taskId++;
+    final completer = Completer<int>();
+
+    _tasks[id] = completer;
+
+    _workers[_currentWorker].send([
+      id,
+      number,
+      _receivePort.sendPort,
+    ]);
+
+    _currentWorker = (_currentWorker + 1) % 2;
+
+    return completer.future;
+  }
+
+  void dispose() {
+    _receivePort.close();
+  }
+}
+
+String generateFinancialReport(Map<String, double> finances) {
+  StringBuffer report = StringBuffer();
+
+  report.writeln("Финансовый отчет за год");
+  report.writeln("------------------------");
+
+  finances.forEach((month, amount) {
+    report.writeln("$month: $amount");
+  });
+
+  double total = finances.values.fold(
+    0,
+    (sum, value) => sum + value,
+  );
+
+  report.writeln("------------------------");
+  report.writeln("Итого: $total");
+
+  return report.toString();
+}
+
+Future<String> generatePdfReport(
+  Map<String, double> finances,
+) {
+  return Isolate.run(
+    () => generateFinancialReport(finances),
+  );
+}
+
+Future<void> compareSorting() async {
+  List<int> numbers = List.generate(
+    1000000,
+    (_) => Random().nextInt(1000000),
+  );
+
+  Stopwatch stopwatch = Stopwatch()..start();
+
+  List<int> syncNumbers = List.from(numbers);
+  syncNumbers.sort();
+
+  stopwatch.stop();
+
+  print(
+    "Главный поток: ${stopwatch.elapsedMilliseconds} мс",
+  );
+
+  stopwatch.reset();
+  stopwatch.start();
+
+  List<int> isolateNumbers = await Isolate.run(() {
+    List<int> sorted = List.from(numbers);
+    sorted.sort();
+    return sorted;
+  });
+
+  stopwatch.stop();
+
+  print(
+    "Изолят: ${stopwatch.elapsedMilliseconds} мс",
+  );
+}
+
+Future<Float32List> convertAudioSamples(
+  Float32List samples,
+) {
+  return Isolate.run(() {
+    return Float32List.fromList(
+      samples.map((sample) => sample / 32768.0).toList(),
+    );
+  });
+}
+
+Future<TransferableTypedData> transferLargeBuffer(
+  TransferableTypedData data,
+) async {
+  return await Isolate.run(() {
+    return data;
+  });
+}
+
+Блок 5: Сложные асинхронные архитектуры и отказоустойчивость
+
+    Отмена сетевой операции через CancelToken: Реализуйте класс токена отмены, выбрасывающий CancellationException при прерывании пользователем ухода со страницы.
+    Репликация базы данных с разрешением конфликтов: Синхронизируйте две асинхронные очереди изменений с временными метками (Timestamps).
+    Асинхронная очередь сохранения офлайн-заказов: Сохраняйте оформленные без интернета заказы в локальную очередь и автоматически отправляйте их по одному при восстановлении сети.
+    Паттерн Circuit Breaker: Реализуйте защиту от падения сервера: если 5 запросов подряд завершились ошибкой, переведите сервис в режим «Разрыв цепи» на 30 секунд.
+    Асинхронный семафор (Rate Limiter): Ограничьте число одновременных сетевых обращений к API до 3 параллельных потоков.
+    Гонка состояний при быстром вводе (Race Condition Fix): Защитите поисковую строку: гарантируйте, что старый медленный ответ сервера не перезапишет новый быстрый ответ.
+    Слушатель жизненного цикла приложения: Свяжите события сворачивания приложения с мгновенной приостановкой всех активных StreamSubscription.
+    Конечный автомат асинхронной синхронизации: Реализуйте переключение стейтов Idle -> Syncing(progress) -> Success -> Error с защитой от повторного запуска во время синхронизации.
+    Многоуровневый кэш (Memory -> Disk -> Network): Спроектируйте функцию, последовательно проверяющую быструю оперативную память, затем локальный диск и только потом идущую в сеть.
+    Итоговый реактивный модуль финансового терминала (Production Architecture):
+        Подключите непрерывный поток биржевых котировок через WebSocket-имитатор.
+        Передайте расчет скользящей волатильности в параллельный изолят (Isolate.run).
+        Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
+        Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов dispose() для всех контроллеров и подписок.
+
+
 import 'dart:async';
 import 'dart:math';
 import 'dart:collection';
 import 'dart:isolate';
 
+// Блок 5. Сложные асинхронные архитектуры и отказоустойчивость
 
 class CancellationException implements Exception {
   final String message;
@@ -2217,7 +3251,3 @@ class FinancialTerminal {
     await _screenController.close();
   }
 }
-```
-
-
----
