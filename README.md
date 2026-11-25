@@ -1691,25 +1691,7 @@ String generateFinancialReport(Map<String, double> finances) {
   StringBuffer report = StringBuffer();
 
   report.writeln("Финансовый отчет за год");
-  report.writeln("
-
----
-
----
-
----
-
----
-
----
-
----
-
----
-
----
-
-");
+  report.writeln("");
 
   finances.forEach((month, amount) {
     report.writeln("$month: $amount");
@@ -1721,22 +1703,6 @@ String generateFinancialReport(Map<String, double> finances) {
   );
 
   report.writeln("
-
----
-
----
-
----
-
----
-
----
-
----
-
----
-
----
 
 ");
   report.writeln("Итого: $total");
@@ -1821,3 +1787,425 @@ Future<TransferableTypedData> transferLargeBuffer(
     - Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
     - Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов `dispose()` для всех контроллеров и подписок.
 
+
+import 'dart:async';
+import 'dart:math';
+import 'dart:collection';
+import 'dart:isolate';
+
+// Блок 5. Сложные асинхронные архитектуры и отказоустойчивость
+
+class CancellationException implements Exception {
+  final String message;
+
+  CancellationException(this.message);
+}
+
+class CancelToken {
+  bool _isCancelled = false;
+
+  bool get isCancelled => _isCancelled;
+
+  void cancel() {
+    _isCancelled = true;
+  }
+
+  void throwIfCancelled() {
+    if (_isCancelled) {
+      throw CancellationException("Операция отменена");
+    }
+  }
+}
+
+Future<String> cancellableRequest(CancelToken token) async {
+  for (int i = 0; i < 10; i++) {
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    token.throwIfCancelled();
+  }
+
+  return "Запрос завершен";
+}
+
+class DatabaseChange {
+  final String key;
+  final String value;
+  final DateTime timestamp;
+
+  DatabaseChange(this.key, this.value, this.timestamp);
+}
+
+class DatabaseReplication {
+  final Map<String, DatabaseChange> databaseA = {};
+  final Map<String, DatabaseChange> databaseB = {};
+
+  Future<void> synchronize() async {
+    await Future.wait([
+      _replicate(databaseA, databaseB),
+      _replicate(databaseB, databaseA),
+    ]);
+  }
+
+  Future<void> _replicate(
+    Map<String, DatabaseChange> source,
+    Map<String, DatabaseChange> target,
+  ) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    for (var entry in source.entries) {
+      var existing = target[entry.key];
+
+      if (existing == null ||
+          entry.value.timestamp.isAfter(existing.timestamp)) {
+        target[entry.key] = entry.value;
+      }
+    }
+  }
+}
+
+class OfflineOrderQueue {
+  final Queue<String> _orders = Queue<String>();
+
+  bool _isOnline = false;
+  bool _isSending = false;
+
+  void addOrder(String order) {
+    _orders.add(order);
+    _processQueue();
+  }
+
+  void setOnline(bool online) {
+    _isOnline = online;
+    _processQueue();
+  }
+
+  Future<void> _processQueue() async {
+    if (!_isOnline || _isSending) return;
+
+    _isSending = true;
+
+    try {
+      while (_orders.isNotEmpty && _isOnline) {
+        String order = _orders.first;
+
+        try {
+          await _sendOrder(order);
+          _orders.removeFirst();
+        } catch (e) {
+          break;
+        }
+      }
+    } finally {
+      _isSending = false;
+    }
+  }
+
+  Future<void> _sendOrder(String order) async {
+    await Future.delayed(const Duration(seconds: 1));
+    print("Заказ отправлен: $order");
+  }
+}
+
+class CircuitBreaker {
+  int _failures = 0;
+  bool _isOpen = false;
+  DateTime? _openedAt;
+
+  Future<T> execute<T>(Future<T> Function() request) async {
+    if (_isOpen) {
+      if (DateTime.now().difference(_openedAt!) <
+          const Duration(seconds: 30)) {
+        throw Exception("Circuit Breaker: Разрыв цепи");
+      }
+
+      _isOpen = false;
+      _failures = 0;
+    }
+
+    try {
+      T result = await request();
+      _failures = 0;
+      return result;
+    } catch (e) {
+      _failures++;
+
+      if (_failures >= 5) {
+        _isOpen = true;
+        _openedAt = DateTime.now();
+      }
+
+      rethrow;
+    }
+  }
+}
+
+class AsyncSemaphore {
+  final int maxConcurrent;
+  int _active = 0;
+
+  final Queue<Completer<void>> _waiting = Queue();
+
+  AsyncSemaphore(this.maxConcurrent);
+
+  Future<T> execute<T>(Future<T> Function() task) async {
+    if (_active >= maxConcurrent) {
+      final completer = Completer<void>();
+      _waiting.add(completer);
+      await completer.future;
+    }
+
+    _active++;
+
+    try {
+      return await task();
+    } finally {
+      _active--;
+
+      if (_waiting.isNotEmpty) {
+        _waiting.removeFirst().complete();
+      }
+    }
+  }
+}
+
+class SearchManager {
+  int _requestId = 0;
+
+  Future<void> search(
+    String query,
+    void Function(String) onResult,
+  ) async {
+    int currentId = ++_requestId;
+
+    String result = await _serverSearch(query);
+
+    if (currentId == _requestId) {
+      onResult(result);
+    }
+  }
+
+  Future<String> _serverSearch(String query) async {
+    await Future.delayed(
+      Duration(milliseconds: query.length * 300),
+    );
+
+    return "Результат поиска: $query";
+  }
+}
+
+class AppLifecycleManager {
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+
+  void addSubscription(StreamSubscription<dynamic> subscription) {
+    _subscriptions.add(subscription);
+  }
+
+  Future<void> onAppPaused() async {
+    for (var subscription in _subscriptions) {
+      await subscription.pause();
+    }
+  }
+
+  void onAppResumed() {
+    for (var subscription in _subscriptions) {
+      subscription.resume();
+    }
+  }
+
+  Future<void> dispose() async {
+    for (var subscription in _subscriptions) {
+      await subscription.cancel();
+    }
+
+    _subscriptions.clear();
+  }
+}
+
+abstract class SyncState {}
+
+class Idle extends SyncState {}
+
+class Syncing extends SyncState {
+  final double progress;
+
+  Syncing(this.progress);
+}
+
+class Success extends SyncState {}
+
+class Error extends SyncState {
+  final Object error;
+
+  Error(this.error);
+}
+
+class SyncManager {
+  final StreamController<SyncState> _controller =
+      StreamController<SyncState>.broadcast();
+
+  bool _isSyncing = false;
+
+  Stream<SyncState> get stream => _controller.stream;
+
+  Future<void> synchronize() async {
+    if (_isSyncing) return;
+
+    _isSyncing = true;
+    _controller.add(Syncing(0));
+
+    try {
+      for (int i = 1; i <= 10; i++) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        _controller.add(Syncing(i / 10));
+      }
+
+      _controller.add(Success());
+    } catch (e) {
+      _controller.add(Error(e));
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  void dispose() {
+    _controller.close();
+  }
+}
+
+class MultiLevelCache<T> {
+  final Map<String, T> memoryCache = {};
+
+  final Future<T?> Function(String) readDisk;
+  final Future<void> Function(String, T) writeDisk;
+  final Future<T> Function(String) fetchNetwork;
+
+  MultiLevelCache({
+    required this.readDisk,
+    required this.writeDisk,
+    required this.fetchNetwork,
+  });
+
+  Future<T> get(String key) async {
+    if (memoryCache.containsKey(key)) {
+      return memoryCache[key] as T;
+    }
+
+    T? diskData = await readDisk(key);
+
+    if (diskData != null) {
+      memoryCache[key] = diskData;
+      return diskData;
+    }
+
+    T networkData = await fetchNetwork(key);
+
+    memoryCache[key] = networkData;
+    await writeDisk(key, networkData);
+
+    return networkData;
+  }
+}
+
+class FinancialTerminal {
+  final StreamController<double> _quoteController =
+      StreamController<double>();
+
+  final StreamController<double> _screenController =
+      StreamController<double>.broadcast();
+
+  StreamSubscription<double>? _quoteSubscription;
+
+  Timer? _reconnectTimer;
+
+  bool _disposed = false;
+  double _previousPrice = 0;
+
+  Stream<double> get screenStream => _screenController.stream;
+
+  Future<void> connect() async {
+    if (_disposed) return;
+
+    try {
+      _quoteSubscription = _webSocketSimulator().listen(
+        (price) async {
+          if (_disposed) return;
+
+          if (_previousPrice != 0) {
+            double volatility = await Isolate.run(() {
+              return (price - _previousPrice).abs() /
+                  _previousPrice;
+            });
+
+            if (!_disposed) {
+              _screenController.add(volatility);
+            }
+          }
+
+          _previousPrice = price;
+        },
+        onError: (error) {
+          _scheduleReconnect();
+        },
+        onDone: () {
+          _scheduleReconnect();
+        },
+      );
+    } catch (e) {
+      _scheduleReconnect();
+    }
+  }
+
+  Stream<double> _webSocketSimulator() async* {
+    final random = Random();
+    double price = 90000;
+
+    for (int i = 0; i < 100; i++) {
+      if (_disposed) return;
+
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      price += (random.nextDouble() - 0.5) * 1000;
+
+      yield price;
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (_disposed || _reconnectTimer != null) return;
+
+    _reconnectTimer = Timer(
+      const Duration(seconds: 2),
+      () {
+        _reconnectTimer = null;
+        connect();
+      },
+    );
+  }
+
+  Stream<double> throttle60FPS(Stream<double> stream) async* {
+    DateTime? lastUpdate;
+
+    await for (final value in stream) {
+      DateTime now = DateTime.now();
+
+      if (lastUpdate == null ||
+          now.difference(lastUpdate).inMilliseconds >= 16) {
+        lastUpdate = now;
+        yield value;
+      }
+    }
+  }
+
+  Future<void> dispose() async {
+    if (_disposed) return;
+
+    _disposed = true;
+
+    _reconnectTimer?.cancel();
+
+    await _quoteSubscription?.cancel();
+
+    await _quoteController.close();
+    await _screenController.close();
+  }
+}
