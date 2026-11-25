@@ -1787,7 +1787,7 @@ Future<TransferableTypedData> transferLargeBuffer(
     - Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
     - Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов `dispose()` для всех контроллеров и подписок.
 
-
+```dart
 import 'dart:async';
 import 'dart:math';
 import 'dart:collection';
@@ -2208,4 +2208,5 @@ class FinancialTerminal {
     await _quoteController.close();
     await _screenController.close();
   }
+---
 }
