@@ -1,5 +1,4 @@
 ---
-
 title: "Практическая работа #9: Асинхронное программирование в Dart"
 discipline: "Разработка мобильных приложений"
 tags:
@@ -13,7 +12,6 @@ tags:
     event-loop,
     flutter,
   ]
-
 ---
 
 # Практическая работа: Асинхронное программирование в Dart (Event Loop, Future, Stream, Isolates)
@@ -23,7 +21,7 @@ tags:
 
 ---
 
-## Содержание
+## 📋 Содержание
 
 1. [Модель параллелизма Dart: однопоточность и Event Loop](#1-модель-параллелизма-dart-однопоточность-и-event-loop)
 2. [Тема 1. Отложенные вычисления: Future API и синтаксис async/await](#тема-1-отложенные-вычисления-future-api-и-синтаксис-asyncawait)
@@ -40,7 +38,7 @@ tags:
 
 ### Архитектура цикла событий (Event Loop)
 
-```text
+```
                             СТАРТ ПРОГРАММЫ (main())
                                        │
                                        ▼
@@ -144,91 +142,72 @@ void main() async {
 4. **Повторные попытки с задержкой (Retry Pattern):** Напишите функцию `retry(Future Function() task, int maxAttempts)`, которая при падении задачи повторяет вызов до 3 раз с паузой в 1 секунду.
 5. **Цепочка промисов через then/catchError:** Реализуйте аналогичную логику авторизации без использования ключевых слов `async/await`, используя только методы `.then()`, `.catchError()` и `.whenComplete()`.
 
-```dart
-class AuthException implements Exception {
-  final String message;
+---
 
-  AuthException(this.message);
-}
+## Решение Тема 1\*
+```dart
+// Тема 1. Отложенные вычисления: Future API и async/await
+
+// Задание 1
+class AuthException implements Exception {}
 
 Future<bool> login(String user, String pass) async {
   await Future.delayed(const Duration(milliseconds: 1500));
-
-  if (pass == "1234") {
-    return true;
-  } else {
-    throw AuthException("Неверный пароль");
-  }
+  if (pass == "1234") return true;
+  throw AuthException();
 }
 
-Future<void> readConfig(String name, int seconds) async {
-  await Future.delayed(Duration(seconds: seconds));
-  return Future.value();
-}
-
-Future<Map<String, String>> readAllConfigs() async {
+// Задание 2
+Future<Map<String, String>> readConfigs() async {
   var results = await Future.wait([
-    Future.delayed(const Duration(seconds: 1), () => "Database config"),
-    Future.delayed(const Duration(seconds: 2), () => "Network config"),
-    Future.delayed(const Duration(seconds: 3), () => "Server config"),
+    Future.delayed(const Duration(seconds: 1), () => "config1"),
+    Future.delayed(const Duration(seconds: 2), () => "config2"),
+    Future.delayed(const Duration(seconds: 3), () => "config3"),
   ]);
 
   return {
-    "database": results[0],
-    "network": results[1],
-    "server": results[2],
+    "file1": results[0],
+    "file2": results[1],
+    "file3": results[2],
   };
 }
 
-Future<String> requestMirror1() async {
-  await Future.delayed(const Duration(milliseconds: 800));
-  return "Ответ от зеркала 1";
-}
-
-Future<String> requestMirror2() async {
-  await Future.delayed(const Duration(milliseconds: 1200));
-  return "Ответ от зеркала 2";
-}
-
-Future<String> fastestRequest() {
+// Задание 3
+Future<String> fastestServer() {
   return Future.any([
-    requestMirror1(),
-    requestMirror2(),
+    Future.delayed(const Duration(milliseconds: 800), () => "Сервер 1"),
+    Future.delayed(const Duration(milliseconds: 1200), () => "Сервер 2"),
   ]);
 }
 
-Future<T> retry<T>(Future<T> Function() task, int maxAttempts) async {
-  for (int i = 0; i < maxAttempts; i++) {
+// Задание 4
+Future retry(Future Function() task, int maxAttempts) async {
+  for (int i = 0; i < maxAttempts && i < 3; i++) {
     try {
       return await task();
     } catch (e) {
-      if (i == maxAttempts - 1) {
-        rethrow;
-      }
-
+      if (i == maxAttempts - 1 || i == 2) rethrow;
       await Future.delayed(const Duration(seconds: 1));
     }
   }
-
-  throw Exception("Все попытки завершились ошибкой");
 }
 
-Future<bool> loginWithoutAsync(String user, String pass) {
+// Задание 5
+Future<bool> loginThen(String user, String pass) {
   return Future.delayed(const Duration(milliseconds: 1500))
-      .then((value) {
-    if (pass == "1234") {
-      return true;
-    } else {
-      throw AuthException("Неверный пароль");
-    }
-  }).catchError((error) {
-    throw error;
-  }).whenComplete(() {
-    print("Авторизация завершена");
-  });
+      .then((_) {
+        if (pass == "1234") return true;
+        throw AuthException();
+      })
+      .catchError((e) {
+        print(e);
+        return false;
+      })
+      .whenComplete(() {
+        print("Авторизация завершена");
+      });
 }
 ```
-
 ---
 
 ## Тема 2. Непрерывные потоки: Stream API и генераторы async\*
@@ -282,72 +261,51 @@ void main() async {
 4. **Агрегация потока (fold/reduce):** Посчитайте сумму чисел, поступающих из потока из 10 элементов, с помощью метода `stream.fold()`.
 5. **Делегирование генератора через yield\*:** Напишите функцию, которая объединяет два потока последовательно с помощью синтаксиса `yield* subStream`.
 
-```dart
-Stream<int> stopWatch() async* {
-  int seconds = 0;
+---
 
+## Решение Тема 2\*
+```dart
+// Тема 2. Непрерывные потоки: Stream API и генераторы async*
+
+// Задание 1
+Stream<int> stopWatch() async* {
+  int i = 0;
   while (true) {
     await Future.delayed(const Duration(seconds: 1));
-    yield seconds++;
+    yield i++;
   }
 }
 
-Stream<(double, double)> gpsCoordinates() async* {
-  double lat = 55.7558;
-  double lon = 37.6173;
-
+// Задание 2
+Stream<(double, double)> gps() async* {
+  double lat = 55.75, lon = 37.61;
   while (true) {
     await Future.delayed(const Duration(milliseconds: 500));
-
-    lat += 0.0001;
-    lon += 0.0001;
-
+    lat += 0.001;
+    lon += 0.001;
     yield (lat, lon);
   }
 }
 
-Stream<double> priceStream() async* {
-  for (double price in [100.0, 101.5, 102.0, 99.5, 103.0]) {
-    await Future.delayed(const Duration(seconds: 1));
-    yield price;
-  }
+// Задание 3
+void broadcastPrices() {
+  Stream<int> prices = Stream.fromIterable([100, 200, 300, 400])
+      .asBroadcastStream();
+
+  prices.listen((price) => print("UI: $price"));
+  prices.listen((price) => print("Лог: $price"));
 }
 
-void subscribeToPrices() {
-  Stream<double> broadcastStream = priceStream().asBroadcastStream();
-
-  broadcastStream.listen(
-    (price) => print("UI-виджет: $price"),
-  );
-
-  broadcastStream.listen(
-    (price) => print("Логгер аналитики: $price"),
-  );
+// Задание 4
+Future<int> sumStream() {
+  return Stream.fromIterable([1, 2, 3, 4, 5, 6, 7, 8, 9 ,10])
+      .fold(0, (sum, number) => sum + number);
 }
 
-Future<int> calculateSum() async {
-  Stream<int> numbers = Stream.fromIterable(
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-  );
-
-  return await numbers.fold(0, (sum, number) => sum + number);
-}
-
-Stream<int> firstStream() async* {
-  yield 1;
-  yield 2;
-  yield 3;
-}
-
-Stream<int> secondStream() async* {
-  yield 4;
-  yield 5;
-  yield 6;
-}
-
-Stream<int> combinedStream() async* {
-  yield* firstStream();
-  yield* secondStream();
+// Задание 5
+Stream<int> combineStreams(Stream<int> stream1, Stream<int> stream2) async* {
+  yield* stream1;
+  yield* stream2;
 }
 ```
 
@@ -360,7 +318,7 @@ Stream<int> combinedStream() async* {
 - **`Sink` (Входной порт):** Место, куда события отправляются (`sink.add()`, `sink.addError()`).
 - **`Stream` (Выходной порт):** Поток, на который подписываются клиенты для чтения данных.
 
-```text
+```
                            STREAM CONTROLLER
         ┌─────────────────────────────────────────────────────┐
         │                                                     │
@@ -430,31 +388,36 @@ void main() async {
 4. **Контроль состояния закрытия:** Напишите метод, проверяющий свойство `controller.isClosed` перед попыткой добавить новое событие, предотвращая падение с ошибкой.
 5. **Счетчик активных подписчиков:** Сконфигурируйте `StreamController(onListen: ..., onCancel: ...)` для отслеживания момента появления и ухода подписчиков.
 
+
+
+---
+
+## Решение Тема 3\*
 ```dart
+// Тема 3. Реактивное управление: StreamController и StreamTransformer
+
 import 'dart:async';
 
-final upperCaseTransformer = StreamTransformer<String, String>.fromHandlers(
-  handleData: (data, sink) {
-    sink.add(data.toUpperCase());
-  },
+// Задание 1
+final upperTransformer = StreamTransformer<String, String>.fromHandlers(
+  handleData: (data, sink) => sink.add(data.toUpperCase()),
 );
 
+// Задание 2
 class SearchControllerWrapper {
-  final StreamController<String> _controller =
-      StreamController<String>.broadcast();
+  final _controller = StreamController<String>();
 
   Stream<String> get stream => _controller.stream;
 
-  void addInput(String input) {
-    _controller.sink.add(input.trim());
-  }
+  Sink<String> get sink => _controller.sink;
 
   void dispose() {
     _controller.close();
   }
 }
 
-void handleControllerError() {
+// Задание 3
+void errorController() {
   final controller = StreamController<String>();
 
   controller.stream.listen(
@@ -466,28 +429,21 @@ void handleControllerError() {
   controller.close();
 }
 
-void addEvent(StreamController<int> controller, int value) {
+// Задание 4
+void safeAdd(StreamController<int> controller, int value) {
   if (!controller.isClosed) {
     controller.sink.add(value);
   }
 }
 
-void trackSubscribers() {
-  final controller = StreamController<int>(
-    onListen: () => print("Подписчик подключился"),
-    onCancel: () => print("Подписчик отключился"),
-  );
+// Задание 5
+int activeSubscribers = 0;
 
-  final subscription = controller.stream.listen(
-    (value) => print(value),
-  );
-
-  controller.sink.add(1);
-  subscription.cancel();
-  controller.close();
-}
+final controller = StreamController<int>.broadcast(
+  onListen: () => activeSubscribers++,
+  onCancel: () => activeSubscribers--,
+);
 ```
-
 ---
 
 ## Тема 4. Истинная многопоточность: Изоляты (Isolates) и Isolate.run
@@ -502,7 +458,7 @@ void trackSubscribers() {
 - Нет блокировок, взаимных дедлоков и мьютексов.
 - Общение между изолятами происходит исключительно через передачу сообщений по системным портам (`SendPort` и `ReceivePort`), либо через метод `Isolate.run()` (начиная с Dart 2.19+).
 
-```text
+```
    MAIN ISOLATE (UI & Event Loop)             BACKGROUND WORKER ISOLATE
 ┌─────────────────────────────────┐       ┌─────────────────────────────────┐
 │ Своя изолированная память       │       │ Своя изолированная память       │
@@ -562,176 +518,147 @@ void _workerEntryPoint(SendPort sendPort) {
 4. **Замер падения FPS:** Напишите скрипт, запускающий цикл на 2 млрд итераций сначала синхронно в `main()`, а затем в `Isolate.run()`, сравнив отзывчивость таймеров.
 5. **Принудительное уничтожение изолята:** Запустите бесконечный фоновый изолят через `Isolate.spawn` и принудительно завершите его работу методом `isolate.kill(priority: Isolate.immediate)`.
 
+---
+
+## Решение Тема 4\*
 ```dart
+// Тема 4. Истинная многопоточность: Изоляты (Isolates) и Isolate.run
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 
-class Record {
+// Задание 1
+class Product {
   final int id;
   final String name;
 
-  Record(this.id, this.name);
+  Product(this.id, this.name);
 
-  factory Record.fromJson(Map<String, dynamic> json) {
-    return Record(json['id'], json['name']);
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(json["id"], json["name"]);
   }
 }
 
-List<Record> parseJson(String jsonString) {
-  List<dynamic> data = jsonDecode(jsonString);
-
-  return data
-      .map((item) => Record.fromJson(item))
-      .toList();
+Future<List<Product>> parseJson(String data) {
+  return Isolate.run(() {
+    return (jsonDecode(data) as List)
+        .map((e) => Product.fromJson(e))
+        .toList();
+  });
 }
 
-Future<void> parallelJsonParser() async {
-  String jsonString = jsonEncode(
-    List.generate(
-      10000,
-      (i) => {'id': i, 'name': 'Record $i'},
-    ),
+Future<void> task1() async {
+  String data = jsonEncode(
+    List.generate(10000, (i) => {"id": i, "name": "Product $i"}),
   );
 
-  List<Record> records = await Isolate.run(
-    () => parseJson(jsonString),
-  );
-
-  print(records.length);
+  List<Product> products = await parseJson(data);
+  print(products.length);
 }
 
+// Задание 2
 List<int> findPrimes(int limit) {
   List<int> primes = [];
 
   for (int i = 2; i <= limit; i++) {
-    bool isPrime = true;
-
+    bool prime = true;
     for (int j = 2; j * j <= i; j++) {
       if (i % j == 0) {
-        isPrime = false;
+        prime = false;
         break;
       }
     }
-
-    if (isPrime) {
-      primes.add(i);
-    }
+    if (prime) primes.add(i);
   }
 
   return primes;
 }
 
-Future<void> searchPrimes() async {
-  Timer.periodic(const Duration(seconds: 1), (timer) {
-    print(".");
-  });
-
-  List<int> primes = await Isolate.run(
-    () => findPrimes(1000000),
+Future<void> task2() async {
+  Timer timer = Timer.periodic(
+    const Duration(seconds: 1),
+    (_) => print("."),
   );
 
-  print("Количество простых чисел: ${primes.length}");
+  List<int> primes = await Isolate.run(() => findPrimes(1000000));
+
+  timer.cancel();
+  print("Найдено: ${primes.length}");
 }
 
-void calculatorWorker(SendPort mainSendPort) {
-  final receivePort = ReceivePort();
-
-  mainSendPort.send(receivePort.sendPort);
+// Задание 3
+void calculatorWorker(SendPort port) {
+  ReceivePort receivePort = ReceivePort();
+  port.send(receivePort.sendPort);
 
   receivePort.listen((message) {
-    int a = message[0];
-    int b = message[1];
-    String operation = message[2];
-
-    int result = 0;
-
-    if (operation == "+") {
-      result = a + b;
-    } else if (operation == "-") {
-      result = a - b;
-    } else if (operation == "*") {
-      result = a * b;
-    }
-
-    mainSendPort.send(result);
+    List data = message;
+    SendPort reply = data[2];
+    reply.send(data[0] + data[1]);
   });
 }
 
-Future<void> calculator() async {
-  final receivePort = ReceivePort();
+Future<void> task3() async {
+  ReceivePort receivePort = ReceivePort();
+  await Isolate.spawn(calculatorWorker, receivePort.sendPort);
 
-  await Isolate.spawn(
-    calculatorWorker,
-    receivePort.sendPort,
-  );
+  SendPort worker = await receivePort.first as SendPort;
 
-  SendPort workerSendPort = await receivePort.first as SendPort;
+  ReceivePort reply = ReceivePort();
+  worker.send([5, 10, reply.sendPort]);
 
-  final resultPort = ReceivePort();
+  print(await reply.first);
 
-  workerSendPort.send([10, 5, "+"]);
-
-  print(await resultPort.first);
+  receivePort.close();
+  reply.close();
 }
 
-int heavyCalculation() {
+// Задание 4
+int heavyCalculation(int iterations) {
   int sum = 0;
-
-  for (int i = 0; i < 2000000000; i++) {
+  for (int i = 0; i < iterations; i++) {
     sum += i % 3;
   }
-
   return sum;
 }
 
-Future<void> measurePerformance() async {
-  Timer.periodic(const Duration(seconds: 1), (timer) {
-    print("Таймер работает");
-  });
-
-  Stopwatch stopwatch = Stopwatch()..start();
-
-  int syncResult = heavyCalculation();
-
-  stopwatch.stop();
-
-  print("Синхронно: ${stopwatch.elapsedMilliseconds} мс");
-  print(syncResult);
-
-  stopwatch.reset();
-  stopwatch.start();
-
-  int isolateResult = await Isolate.run(
-    () => heavyCalculation(),
+Future<void> task4() async {
+  Timer timer = Timer.periodic(
+    const Duration(seconds: 1),
+    (_) => print("Таймер работает"),
   );
 
-  stopwatch.stop();
+  heavyCalculation(2000000000);
+  await Future.delayed(const Duration(seconds: 1));
 
-  print("Изолят: ${stopwatch.elapsedMilliseconds} мс");
-  print(isolateResult);
+  print("Синхронно завершено");
+
+  await Isolate.run(() => heavyCalculation(2000000000));
+
+  print("В изоляте завершено");
+  timer.cancel();
 }
 
-void infiniteWorker(SendPort sendPort) {
-  while (true) {}
+// Задание 5
+void infiniteWorker(SendPort port) {
+  while (true) {
+    // Бесконечная работа
+  }
 }
 
-Future<void> killIsolate() async {
-  final receivePort = ReceivePort();
-
+Future<void> task5() async {
+  ReceivePort receivePort = ReceivePort();
   Isolate isolate = await Isolate.spawn(
     infiniteWorker,
     receivePort.sendPort,
   );
 
-  await Future.delayed(const Duration(seconds: 2));
-
+  await Future.delayed(const Duration(milliseconds: 100));
   isolate.kill(priority: Isolate.immediate);
-
   receivePort.close();
 }
 ```
-
 ---
 
 ## 50 Смешанных заданий по асинхронной разработке
@@ -751,161 +678,107 @@ Future<void> killIsolate() async {
 9. **Параллельное слияние локального и сетевого кэша:** Запустите чтение локальной базы SQLite и сетевой вызов одновременно, вернув локальные данные, если сеть не успела ответить за 300 мс.
 10. **Асинхронный дебаунсер (Debounce):** Напишите функцию, откладывающую выполнение сетевого поиска на 400 мс и сбрасывающую таймер при каждом новом нажатии клавиши.
 
+## Решение Блок 1\*
 ```dart
+// Блок 1. Сетевые запросы, таймеры и Future
+
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
+// Задание 1
 Future<String> fetchData(String url) async {
   await Future.delayed(const Duration(milliseconds: 1200));
 
-  int statusCode = 200;
+  int status = 200;
 
-  if (url.contains("404")) {
-    statusCode = 404;
-  } else if (url.contains("500")) {
-    statusCode = 500;
-  }
+  if (url.contains("404")) status = 404;
+  if (url.contains("500")) status = 500;
 
-  if (statusCode == 200) {
-    return jsonEncode({
-      "status": 200,
-      "url": url,
-      "data": "Данные получены",
-    });
-  } else if (statusCode == 404) {
-    throw HttpException("Ошибка 404: Не найдено");
-  } else {
-    throw HttpException("Ошибка 500: Ошибка сервера");
+  switch (status) {
+    case 200:
+      return '{"status":200,"data":"OK"}';
+    case 404:
+      throw Exception("404 Not Found");
+    case 500:
+      throw Exception("500 Server Error");
+    default:
+      throw Exception("Неизвестная ошибка");
   }
 }
 
-Future<T> fetchWithRetry<T>(Future<T> Function() request) async {
-  int retryCount = 0;
-  List<int> delays = [1, 2, 4, 8];
-
-  while (true) {
+// Задание 2
+Future retryRequest(Future Function() request) async {
+  for (int i = 0; i < 4; i++) {
     try {
       return await request();
     } on SocketException {
-      if (retryCount >= delays.length) {
-        rethrow;
-      }
-
-      await Future.delayed(Duration(seconds: delays[retryCount]));
-      retryCount++;
+      await Future.delayed(Duration(seconds: 1 << i));
     }
   }
+  throw SocketException("Все попытки завершились ошибкой");
 }
 
-Future<Map<String, String>> fetchImageMetadata() async {
-  List<String> urls = List.generate(
-    5,
-    (index) => "image_$index.jpg",
-  );
-
-  Map<String, String> results = {};
+// Задание 3
+Future<List<String>> loadImages() async {
+  List<String> urls = List.generate(5, (i) => "image$i");
+  List<String> results = [];
   int index = 0;
 
   Future<void> worker() async {
     while (index < urls.length) {
       String url = urls[index++];
-
       await Future.delayed(const Duration(seconds: 1));
-
-      results[url] = "Метаданные $url";
+      results.add("Metadata: $url");
     }
   }
 
-  await Future.wait([
-    worker(),
-    worker(),
-  ]);
-
+  await Future.wait([worker(), worker()]);
   return results;
 }
 
-Future<String> pingMirror(String url, int milliseconds) async {
-  await Future.delayed(Duration(milliseconds: milliseconds));
-  return url;
-}
-
-Future<String> findFastestServer() {
+// Задание 4
+Future<String> ping() {
   return Future.any([
-    pingMirror("https://mirror1.com", 800),
-    pingMirror("https://mirror2.com", 1200),
-    pingMirror("https://mirror3.com", 1000),
+    Future.delayed(const Duration(milliseconds: 800), () => "mirror1"),
+    Future.delayed(const Duration(milliseconds: 1200), () => "mirror2"),
+    Future.delayed(const Duration(milliseconds: 1500), () => "mirror3"),
   ]);
 }
 
-class CancelToken {
-  bool isCancelled = false;
-
-  void cancel() {
-    isCancelled = true;
-  }
+// Задание 5
+Future<void> saveProfile() async {
+  await Future.delayed(const Duration(seconds: 5));
 }
 
-Future<void> saveProfile(CancelToken token) async {
-  for (int i = 0; i < 10; i++) {
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (token.isCancelled) {
-      throw Exception("Операция прервана");
-    }
-  }
+Future<void> saveWithTimeout() async {
+  await saveProfile().timeout(
+    const Duration(seconds: 3),
+    onTimeout: () => throw TimeoutException("Сохранение прервано"),
+  );
 }
 
-Future<void> saveProfileWithTimeout() async {
-  final token = CancelToken();
-
-  try {
-    await Future.any([
-      saveProfile(token),
-      Future.delayed(const Duration(seconds: 3), () {
-        token.cancel();
-        throw TimeoutException("Превышено время сохранения профиля");
-      }),
-    ]);
-  } catch (e) {
-    print(e);
-  }
-}
-
+// Задание 6
 class AsyncQueue {
-  Future<void> _tail = Future.value();
+  Future<void> _queue = Future.value();
 
-  Future<T> add<T>(Future<T> Function() task) {
-    final completer = Completer<T>();
-
-    _tail = _tail.then((_) async {
-      try {
-        completer.complete(await task());
-      } catch (e, stackTrace) {
-        completer.completeError(e, stackTrace);
-      }
-    });
-
-    return completer.future;
+  void add(Future Function() task) {
+    _queue = _queue.then((_) => task()).catchError((e) {});
   }
 }
 
+// Задание 7
 Future<int> benchmark(Future Function() task) async {
   Stopwatch stopwatch = Stopwatch()..start();
-
   await task();
-
   stopwatch.stop();
-
   return stopwatch.elapsedMilliseconds;
 }
 
+// Задание 8
 class AppConfig {
-  final Map<String, dynamic> data;
-
-  AppConfig._(this.data);
-
   static Future<AppConfig>? _instance;
+
+  AppConfig();
 
   static Future<AppConfig> getInstance() {
     return _instance ??= _load();
@@ -913,57 +786,44 @@ class AppConfig {
 
   static Future<AppConfig> _load() async {
     await Future.delayed(const Duration(seconds: 1));
-
-    return AppConfig._({
-      "appName": "MyApplication",
-      "version": "1.0.0",
-    });
+    return AppConfig();
   }
 }
 
-Future<String> readLocalDatabase() async {
-  await Future.delayed(const Duration(milliseconds: 200));
-  return "Локальные данные";
-}
-
-Future<String> fetchNetworkData() async {
-  await Future.delayed(const Duration(seconds: 1));
-  return "Сетевые данные";
-}
-
-Future<String> loadCache() async {
-  Future<String> localData = readLocalDatabase();
-
-  return fetchNetworkData().timeout(
-    const Duration(milliseconds: 300),
-    onTimeout: () => localData,
+// Задание 9
+Future<String> getCache() async {
+  Future<String> local = Future.delayed(
+    const Duration(milliseconds: 100),
+    () => "Локальные данные",
   );
+
+  Future<String> network = Future.delayed(
+    const Duration(seconds: 1),
+    () => "Сетевые данные",
+  );
+
+  return Future.any([
+    local,
+    network.timeout(
+      const Duration(milliseconds: 300),
+      onTimeout: () => local,
+    ),
+  ]);
 }
 
-class Debouncer {
-  final Duration delay;
-  final void Function(String) onSearch;
+// Задание 10
+Timer? debounceTimer;
 
-  Timer? _timer;
+void debounce(String query) {
+  debounceTimer?.cancel();
 
-  Debouncer({
-    required this.delay,
-    required this.onSearch,
+  debounceTimer = Timer(const Duration(milliseconds: 400), () {
+    fetchData(query).then(print).catchError(print);
   });
-
-  void search(String query) {
-    _timer?.cancel();
-
-    _timer = Timer(delay, () {
-      onSearch(query);
-    });
-  }
-
-  void dispose() {
-    _timer?.cancel();
-  }
 }
 ```
+---
+
 
 ### Блок 2: Потоковые данные, датчики и Stream API
 
@@ -978,36 +838,36 @@ class Debouncer {
 19. **Потоковый калькулятор скользящего среднего:** Спроектируйте стрим, принимающий числа и отдающий скользящее среднее значение последних 5 измерений.
 20. **Преобразование Stream в Future:** Извлеките последнее значение из конечного потока с помощью метода `stream.last`.
 
+## Решение Блок 2\*
 ```dart
+// Блок 2. Потоковые данные, датчики и Stream API
+
 import 'dart:async';
 import 'dart:math';
 
-Stream<double> bitcoinPrices() async* {
-  final random = Random();
-  double price = 90000;
+// Задание 11
+Stream<double> cryptoPrices() async* {
+  Random random = Random();
+  double price = 50000;
 
   while (true) {
     await Future.delayed(const Duration(milliseconds: 200));
-
-    price += (random.nextDouble() - 0.5) * 1000;
-
+    price += random.nextDouble() * 1000 - 500;
     yield price;
   }
 }
 
-Stream<double> filterPriceSpikes(Stream<double> stream) async* {
-  double? previousPrice;
+Stream<double> filterSpikes(Stream<double> stream) {
+  double previous = 50000;
 
-  await for (final price in stream) {
-    if (previousPrice == null ||
-        ((price - previousPrice).abs() / previousPrice) <= 0.05) {
-      yield price;
-    }
-
-    previousPrice = price;
-  }
+  return stream.where((price) {
+    double change = (price - previous).abs() / previous * 100;
+    previous = price;
+    return change > 5;
+  });
 }
 
+// Задание 12
 Stream<int> downloadProgress() async* {
   for (int i = 0; i <= 100; i += 10) {
     await Future.delayed(const Duration(milliseconds: 300));
@@ -1015,158 +875,125 @@ Stream<int> downloadProgress() async* {
   }
 }
 
-Stream<String> mergeNavigationStreams(
-  Stream<String> locationStream,
-  Stream<String> compassStream,
+// Задание 13
+Stream<dynamic> mergeStreams(
+  Stream<dynamic> location,
+  Stream<dynamic> compass,
 ) {
-  return StreamGroup.merge([
-    locationStream,
-    compassStream,
-  ]);
+  StreamController<dynamic> controller = StreamController();
+
+  location.listen(controller.add);
+  compass.listen(controller.add);
+
+  return controller.stream;
 }
 
-Stream<T> throttle<T>(Stream<T> stream) async* {
-  DateTime? lastEvent;
+// Задание 14
+Stream<T> throttle<T>(Stream<T> stream) {
+  DateTime last = DateTime(2000);
 
-  await for (final event in stream) {
+  return stream.where((event) {
     DateTime now = DateTime.now();
-
-    if (lastEvent == null ||
-        now.difference(lastEvent).inMilliseconds >= 1000) {
-      lastEvent = now;
-      yield event;
+    if (now.difference(last).inSeconds >= 1) {
+      last = now;
+      return true;
     }
-  }
+    return false;
+  });
 }
 
+// Задание 15
 Stream<(double, double, double)> accelerometer() async* {
-  final random = Random();
+  Random random = Random();
 
   while (true) {
     await Future.delayed(const Duration(milliseconds: 200));
-
     yield (
-      random.nextDouble() * 3,
-      random.nextDouble() * 3,
-      random.nextDouble() * 3,
+      random.nextDouble() * 20,
+      random.nextDouble() * 20,
+      random.nextDouble() * 20,
     );
   }
 }
 
-Stream<int> countSteps(
-  Stream<(double, double, double)> stream,
-) async* {
+Stream<int> countSteps(Stream<(double, double, double)> stream) async* {
   int steps = 0;
 
-  await for (final acceleration in stream) {
-    double magnitude = sqrt(
-      acceleration.$1 * acceleration.$1 +
-          acceleration.$2 * acceleration.$2 +
-          acceleration.$3 * acceleration.$3,
-    );
-
-    if (magnitude > 2.5) {
-      steps++;
-      yield steps;
+  await for (var data in stream) {
+    if (data.$1.abs() + data.$2.abs() + data.$3.abs() > 25) {
+      yield ++steps;
     }
   }
 }
 
-Stream<String> createChatStream() async* {
-  await Future.delayed(const Duration(seconds: 1));
-  yield "Новое сообщение";
-  throw Exception("Соединение потеряно");
-}
-
-void listenToChat() {
-  late StreamSubscription<String> subscription;
-
-  void connect() {
-    subscription = createChatStream().listen(
-      (message) => print(message),
-      onError: (error) async {
-        await Future.delayed(const Duration(seconds: 2));
-        connect();
-      },
-    );
-  }
-
-  connect();
-}
-
-Stream<List<T>> bufferClicks<T>(Stream<T> stream) async* {
-  final buffer = <T>[];
-  final controller = StreamController<List<T>>();
-
-  Timer? timer;
-
-  void flush() {
-    if (buffer.isNotEmpty) {
-      controller.add(List<T>.from(buffer));
-      buffer.clear();
-    }
-  }
-
-  timer = Timer.periodic(
-    const Duration(seconds: 3),
-    (_) => flush(),
+// Задание 16
+void reconnect(Stream Function() createStream) {
+  createStream().listen(
+    print,
+    onError: (e) {
+      Future.delayed(const Duration(seconds: 2), () {
+        reconnect(createStream);
+      });
+    },
   );
+}
 
-  final subscription = stream.listen(
-    (event) {
-      buffer.add(event);
+// Задание 17
+Stream<List<T>> buffer<T>(Stream<T> stream) {
+  StreamController<List<T>> controller = StreamController();
+  List<T> items = [];
 
-      if (buffer.length >= 5) {
-        flush();
+  Timer timer = Timer.periodic(const Duration(seconds: 3), (_) {
+    if (items.isNotEmpty) {
+      controller.add(List.from(items));
+      items.clear();
+    }
+  });
+
+  stream.listen(
+    (data) {
+      items.add(data);
+      if (items.length == 5) {
+        controller.add(List.from(items));
+        items.clear();
       }
     },
-    onError: controller.addError,
     onDone: () {
-      flush();
-      timer?.cancel();
+      if (items.isNotEmpty) controller.add(items);
+      timer.cancel();
       controller.close();
     },
   );
 
-  yield* controller.stream;
-
-  await subscription.cancel();
+  return controller.stream;
 }
 
-Stream<int> otpCountdown() async* {
+// Задание 18
+Stream<int> otpTimer() async* {
   for (int i = 60; i >= 0; i--) {
     await Future.delayed(const Duration(seconds: 1));
     yield i;
   }
-
-  print("Срок действия OTP-кода истек");
+  print("Срок действия кода истек");
 }
 
+// Задание 19
 Stream<double> movingAverage(Stream<double> stream) async* {
-  final values = <double>[];
+  List<double> values = [];
 
-  await for (final value in stream) {
+  await for (double value in stream) {
     values.add(value);
-
-    if (values.length > 5) {
-      values.removeAt(0);
-    }
-
-    double average =
-        values.reduce((a, b) => a + b) / values.length;
-
-    yield average;
+    if (values.length > 5) values.removeAt(0);
+    yield values.reduce((a, b) => a + b) / values.length;
   }
 }
 
-Future<void> getLastValue() async {
-  Stream<int> stream = Stream.fromIterable([10, 20, 30, 40, 50]);
-
-  int lastValue = await stream.last;
-
-  print(lastValue);
+// Задание 20
+Future<int> getLast(Stream<int> stream) {
+  return stream.last;
 }
 ```
+---
 
 ### Блок 3: Реактивные шины событий и StreamController
 
@@ -1181,319 +1008,180 @@ Future<void> getLastValue() async {
 29. **Валидация формы регистрации на стримах:** Создайте два потока для полей Email и Пароль, объедините их через `Rx.combineLatest`-подобную логику и отдавайте флаг активности кнопки `isSubmitEnabled`.
 30. **Потоковый логгер крашей:** Направляйте все неотловленные ошибки приложения через `StreamController` в фоновый модуль отправки аналитики.
 
+## Решение Блок 3\*
 ```dart
-import 'dart:async';
+// Блок 3. Реактивные шины событий и StreamController
 
+import 'dart:async';
+import 'package:flutter/material.dart';
+
+// Задание 21
 class EventBus {
   EventBus._();
 
   static final EventBus instance = EventBus._();
+  final _controller = StreamController<dynamic>.broadcast();
 
-  final StreamController<Object> _controller =
-      StreamController<Object>.broadcast();
+  Stream<dynamic> get stream => _controller.stream;
 
-  Stream<Object> get stream => _controller.stream;
-
-  void fire(Object event) {
-    _controller.sink.add(event);
-  }
-
-  void dispose() {
-    _controller.close();
-  }
+  void emit(dynamic event) => _controller.add(event);
 }
 
-class CartState {
-  final int itemCount;
-  final double totalPrice;
-
-  CartState(this.itemCount, this.totalPrice);
-}
-
+// Задание 22
 class CartStore {
-  final StreamController<CartState> _controller =
-      StreamController<CartState>.broadcast();
+  final _controller = StreamController<(int, double)>.broadcast();
+  int count = 0;
+  double total = 0;
 
-  final Map<String, double> _products = {};
+  Stream<(int, double)> get stream => _controller.stream;
 
-  Stream<CartState> get stream => _controller.stream;
-
-  void add(String name, double price) {
-    _products[name] = (_products[name] ?? 0) + price;
-    _update();
+  void add(double price) {
+    count++;
+    total += price;
+    _controller.add((count, total));
   }
 
-  void remove(String name) {
-    _products.remove(name);
-    _update();
-  }
-
-  void _update() {
-    double total = _products.values.fold(0, (a, b) => a + b);
-
-    _controller.add(
-      CartState(_products.length, total),
-    );
-  }
-
-  void dispose() {
-    _controller.close();
+  void remove(double price) {
+    if (count > 0) {
+      count--;
+      total -= price;
+      _controller.add((count, total));
+    }
   }
 }
 
-class NotificationBadge {
-  final StreamController<int> _controller =
-      StreamController<int>.broadcast();
-
-  int _count = 0;
+// Задание 23
+class NotificationCounter {
+  final _controller = StreamController<int>.broadcast();
+  int count = 0;
 
   Stream<int> get stream => _controller.stream;
 
-  void increment() {
-    _count++;
-    _controller.add(_count);
-  }
+  void increment() => _controller.add(++count);
 
   void reset() {
-    _count = 0;
-    _controller.add(_count);
-  }
-
-  void dispose() {
-    _controller.close();
+    count = 0;
+    _controller.add(count);
   }
 }
 
+// Задание 24
 abstract class PlayerState {}
 
 class PlayerStopped extends PlayerState {}
 
 class PlayerPlaying extends PlayerState {
-  final String track;
-
+  String track;
   PlayerPlaying(this.track);
 }
 
 class PlayerPaused extends PlayerState {}
 
 class AudioPlayerBloc {
-  final StreamController<PlayerState> _controller =
-      StreamController<PlayerState>.broadcast();
+  final _controller = StreamController<PlayerState>.broadcast();
 
   Stream<PlayerState> get stream => _controller.stream;
 
-  void play(String track) {
-    _controller.add(PlayerPlaying(track));
-  }
-
-  void pause() {
-    _controller.add(PlayerPaused());
-  }
-
-  void stop() {
-    _controller.add(PlayerStopped());
-  }
-
-  void dispose() {
-    _controller.close();
-  }
+  void play(String track) => _controller.add(PlayerPlaying(track));
+  void pause() => _controller.add(PlayerPaused());
+  void stop() => _controller.add(PlayerStopped());
 }
 
+// Задание 25
 class LoadNextPage {}
 
-class PaginationController {
-  final StreamController<LoadNextPage> _requestController =
-      StreamController<LoadNextPage>();
+class PaginationStream {
+  final _controller = StreamController<LoadNextPage>();
+  int page = 0;
 
-  final StreamController<List<String>> _newsController =
-      StreamController<List<String>>.broadcast();
-
-  int _page = 0;
-
-  Stream<List<String>> get stream => _newsController.stream;
-
-  PaginationController() {
-    _requestController.stream.listen((event) async {
-      _page++;
-
-      await Future.delayed(const Duration(seconds: 1));
-
-      _newsController.add([
-        "Новость $_page.1",
-        "Новость $_page.2",
-        "Новость $_page.3",
-      ]);
-    });
+  Stream<List<String>> get stream async* {
+    await for (var event in _controller.stream) {
+      page++;
+      yield List.generate(10, (i) => "Новость ${page * 10 + i}");
+    }
   }
 
-  void loadNextPage() {
-    _requestController.add(LoadNextPage());
-  }
-
-  void dispose() {
-    _requestController.close();
-    _newsController.close();
-  }
+  void loadNext() => _controller.add(LoadNextPage());
 }
 
-enum ThemeMode {
-  dark,
-  light,
-}
-
+// Задание 26
 class ThemeManager {
-  final StreamController<ThemeMode> _controller =
-      StreamController<ThemeMode>.broadcast();
-
-  ThemeMode _theme = ThemeMode.light;
+  final _controller = StreamController<ThemeMode>.broadcast();
+  ThemeMode mode = ThemeMode.light;
 
   Stream<ThemeMode> get stream => _controller.stream;
 
-  ThemeMode get currentTheme => _theme;
-
-  void toggleTheme() {
-    _theme = _theme == ThemeMode.light
-        ? ThemeMode.dark
-        : ThemeMode.light;
-
-    _controller.add(_theme);
-  }
-
-  void dispose() {
-    _controller.close();
+  void toggle() {
+    mode = mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    _controller.add(mode);
   }
 }
 
-enum ConnectivityStatus {
-  WiFi,
-  Cellular,
-  None,
-}
+// Задание 27
+enum Connectivity { wifi, cellular, none }
 
 class ConnectivityController {
-  final StreamController<ConnectivityStatus> _controller =
-      StreamController<ConnectivityStatus>.broadcast();
+  final _controller = StreamController<Connectivity>.broadcast();
 
-  Stream<ConnectivityStatus> get stream => _controller.stream;
+  Stream<Connectivity> get stream => _controller.stream;
 
-  void updateStatus(ConnectivityStatus status) {
-    _controller.add(status);
-  }
-
-  void dispose() {
-    _controller.close();
-  }
+  void update(Connectivity value) => _controller.add(value);
 }
 
+// Задание 28
 class AutoDisposeController<T> {
-  late final StreamController<T> _controller;
-
-  int _listeners = 0;
+  late final StreamController<T> controller;
 
   AutoDisposeController() {
-    _controller = StreamController<T>(
-      onListen: () {
-        _listeners++;
-      },
-      onCancel: () {
-        _listeners--;
-
-        if (_listeners <= 0) {
-          close();
-        }
-      },
+    controller = StreamController<T>.broadcast(
+      onCancel: () => controller.close(),
     );
   }
 
-  Stream<T> get stream => _controller.stream;
-
+  Stream<T> get stream => controller.stream;
   void add(T value) {
-    if (!_controller.isClosed) {
-      _controller.add(value);
-    }
-  }
-
-  void close() {
-    if (!_controller.isClosed) {
-      _controller.close();
-    }
+    if (!controller.isClosed) controller.add(value);
   }
 }
 
-class RegistrationController {
-  final StreamController<String> _emailController =
-      StreamController<String>.broadcast();
-
-  final StreamController<String> _passwordController =
-      StreamController<String>.broadcast();
-
-  final StreamController<bool> _submitController =
-      StreamController<bool>.broadcast();
+// Задание 29
+class FormValidator {
+  final email = StreamController<String>.broadcast();
+  final password = StreamController<String>.broadcast();
+  final _result = StreamController<bool>.broadcast();
 
   String _email = "";
   String _password = "";
 
-  Stream<bool> get isSubmitEnabled => _submitController.stream;
+  Stream<bool> get isSubmitEnabled => _result.stream;
 
-  RegistrationController() {
-    _emailController.stream.listen((email) {
-      _email = email;
-      _validate();
+  FormValidator() {
+    email.stream.listen((value) {
+      _email = value;
+      _check();
     });
 
-    _passwordController.stream.listen((password) {
-      _password = password;
-      _validate();
+    password.stream.listen((value) {
+      _password = value;
+      _check();
     });
   }
 
-  void updateEmail(String email) {
-    _emailController.add(email);
-  }
-
-  void updatePassword(String password) {
-    _passwordController.add(password);
-  }
-
-  void _validate() {
-    bool isValid = _email.contains("@") && _password.length >= 8;
-
-    _submitController.add(isValid);
-  }
-
-  void dispose() {
-    _emailController.close();
-    _passwordController.close();
-    _submitController.close();
+  void _check() {
+    _result.add(_email.contains("@") && _password.length >= 8);
   }
 }
 
+// Задание 30
 class CrashLogger {
-  final StreamController<Object> _controller =
-      StreamController<Object>.broadcast();
+  final _controller = StreamController<Object>.broadcast();
 
   Stream<Object> get stream => _controller.stream;
 
-  CrashLogger() {
-    stream.listen((error) {
-      sendAnalytics(error);
-    });
-  }
-
-  void logError(Object error) {
-    _controller.add(error);
-  }
-
-  Future<void> sendAnalytics(Object error) async {
-    await Future.delayed(const Duration(seconds: 1));
-    print("Ошибка отправлена в аналитику: $error");
-  }
-
-  void dispose() {
-    _controller.close();
-  }
+  void log(Object error) => _controller.add(error);
 }
 ```
+---
 
 ### Блок 4: Изоляты и ресурсоемкие параллельные задачи
 
@@ -1508,264 +1196,133 @@ class CrashLogger {
 39. **Конвертер аудио-семплов:** Смоделируйте преобразование массива сырых аудио-семплов в изоляте.
 40. **Безопасная передача больших объектов (TransferableTypedData):** Передайте большой бинарный буфер между изолятами без затратного копирования памяти.
 
+## Решение Блок 4\*
 ```dart
-import 'dart:async';
-import 'dart:convert';
+// Блок 4 — Изоляты и ресурсоемкие параллельные задачи (31–40)
 import 'dart:isolate';
-import 'dart:math';
 import 'dart:typed_data';
-import 'package:archive/archive.dart';
+import 'dart:convert';
+import 'dart:async';
 
-Uint8List generateThumbnail(Uint8List imageBytes) {
+// 31
+Future<Uint8List> generateThumbnail(Uint8List image) async {
   return Isolate.run(() {
-    int newLength = imageBytes.length ~/ 4;
-
-    return Uint8List.fromList(
-      imageBytes.sublist(0, newLength),
-    );
-  }) as Uint8List;
-}
-
-Uint8List encryptNotes(String text) {
-  final bytes = utf8.encode(text);
-
-  return Uint8List.fromList(
-    bytes.map((byte) => byte ^ 123).toList(),
-  );
-}
-
-Future<Uint8List> encryptNotesInIsolate(String text) {
-  return Isolate.run(() => encryptNotes(text));
-}
-
-class SearchResult {
-  final String document;
-  final int relevance;
-
-  SearchResult(this.document, this.relevance);
-}
-
-List<SearchResult> searchDocuments(
-  List<String> documents,
-  String query,
-) {
-  List<SearchResult> results = [];
-
-  for (String document in documents) {
-    int relevance = query.allMatches(
-      document.toLowerCase(),
-    ).length;
-
-    if (relevance > 0) {
-      results.add(SearchResult(document, relevance));
-    }
-  }
-
-  results.sort(
-    (a, b) => b.relevance.compareTo(a.relevance),
-  );
-
-  return results.take(10).toList();
-}
-
-Future<List<SearchResult>> fullTextSearch(
-  List<String> documents,
-  String query,
-) {
-  return Isolate.run(
-    () => searchDocuments(documents, query),
-  );
-}
-
-List<List<List<double>>> parseGeoJson(String jsonString) {
-  final data = jsonDecode(jsonString);
-
-  List<List<List<double>>> polygons = [];
-
-  for (var feature in data['features']) {
-    var coordinates =
-        feature['geometry']['coordinates'];
-
-    for (var polygon in coordinates) {
-      List<List<double>> points = [];
-
-      for (var point in polygon) {
-        points.add([
-          point[0].toDouble(),
-          point[1].toDouble(),
-        ]);
-      }
-
-      polygons.add(points);
-    }
-  }
-
-  return polygons;
-}
-
-Future<List<List<List<double>>>> parseGeoJsonInIsolate(
-  String jsonString,
-) {
-  return Isolate.run(() => parseGeoJson(jsonString));
-}
-
-Future<List<int>> compressLogs(List<String> logs) {
-  return Isolate.run(() {
-    String text = logs.join('\n');
-    List<int> bytes = utf8.encode(text);
-
-    return GZipEncoder().encode(bytes);
+    Uint8List resized = Uint8List.fromList(image.take(image.length ~/ 4).toList());
+    return Uint8List.fromList(ZLibEncoder().convert(resized));
   });
 }
 
-void workerEntryPoint(SendPort mainPort) {
-  final receivePort = ReceivePort();
+// 32
+Future<String> encrypt(String text, int key) async {
+  return Isolate.run(() {
+    return String.fromCharCodes(text.codeUnits.map((c) => c ^ key));
+  });
+}
 
-  mainPort.send(receivePort.sendPort);
+// 33
+Future<List<String>> search(List<String> documents, String query) async {
+  return Isolate.run(() {
+    return documents.where((doc) => doc.contains(query)).take(10).toList();
+  });
+}
 
-  receivePort.listen((message) {
-    int id = message[0];
-    int number = message[1];
-    SendPort replyPort = message[2];
+// 34
+Future<List<dynamic>> parseGeoJSON(String json) async {
+  return Isolate.run(() {
+    var data = jsonDecode(json);
+    return data['features']
+        .map((feature) => feature['geometry']['coordinates'])
+        .toList();
+  });
+}
 
-    int result = number * number;
+// 35
+Future<List<int>> compressLogs(String logs) async {
+  return Isolate.run(() {
+    return ZLibEncoder().convert(utf8.encode(logs));
+  });
+}
 
-    replyPort.send([id, result]);
+// 36
+void worker(SendPort mainPort) {
+  ReceivePort workerPort = ReceivePort();
+  mainPort.send(workerPort.sendPort);
+
+  workerPort.listen((message) {
+    int number = message[0];
+    SendPort reply = message[1];
+    reply.send(number * number);
   });
 }
 
 class WorkerPool {
-  final List<SendPort> _workers = [];
-  final ReceivePort _receivePort = ReceivePort();
-
-  int _currentWorker = 0;
-  int _taskId = 0;
-
-  final Map<int, Completer<int>> _tasks = {};
+  List<Isolate> isolates = [];
+  List<SendPort> ports = [];
+  int current = 0;
 
   Future<void> start() async {
-    _receivePort.listen((message) {
-      int id = message[0];
-      int result = message[1];
-
-      _tasks.remove(id)?.complete(result);
-    });
-
     for (int i = 0; i < 2; i++) {
-      final port = ReceivePort();
-
-      await Isolate.spawn(
-        workerEntryPoint,
-        port.sendPort,
-      );
-
-      SendPort worker = await port.first as SendPort;
-
-      _workers.add(worker);
+      ReceivePort port = ReceivePort();
+      isolates.add(await Isolate.spawn(worker, port.sendPort));
+      ports.add(await port.first);
+      port.close();
     }
   }
 
-  Future<int> execute(int number) {
-    int id = _taskId++;
-    final completer = Completer<int>();
-
-    _tasks[id] = completer;
-
-    _workers[_currentWorker].send([
-      id,
-      number,
-      _receivePort.sendPort,
-    ]);
-
-    _currentWorker = (_currentWorker + 1) % 2;
-
-    return completer.future;
+  Future<int> execute(int number) async {
+    ReceivePort result = ReceivePort();
+    ports[current].send([number, result.sendPort]);
+    current = (current + 1) % 2;
+    return await result.first;
   }
 
   void dispose() {
-    _receivePort.close();
+    for (var isolate in isolates) {
+      isolate.kill();
+    }
   }
 }
 
-String generateFinancialReport(Map<String, double> finances) {
-  StringBuffer report = StringBuffer();
-
-  report.writeln("Финансовый отчет за год");
-  report.writeln("");
-
-  finances.forEach((month, amount) {
-    report.writeln("$month: $amount");
+// 37
+Future<String> generateReport() async {
+  return Isolate.run(() {
+    return '''
+Финансовый отчет за год
+Доход: 1000000
+Расходы: 650000
+Прибыль: 350000
+''';
   });
-
-  double total = finances.values.fold(
-    0,
-    (sum, value) => sum + value,
-  );
-
-  report.writeln("
-
-");
-  report.writeln("Итого: $total");
-
-  return report.toString();
 }
 
-Future<String> generatePdfReport(
-  Map<String, double> finances,
-) {
-  return Isolate.run(
-    () => generateFinancialReport(finances),
-  );
-}
-
-Future<void> compareSorting() async {
-  List<int> numbers = List.generate(
-    1000000,
-    (_) => Random().nextInt(1000000),
-  );
+// 38
+Future<void> sortNumbers() async {
+  List<int> numbers = List.generate(1000000, (i) => 1000000 - i);
 
   Stopwatch stopwatch = Stopwatch()..start();
-
-  List<int> syncNumbers = List.from(numbers);
-  syncNumbers.sort();
-
-  stopwatch.stop();
-
-  print(
-    "Главный поток: ${stopwatch.elapsedMilliseconds} мс",
-  );
+  numbers.sort();
+  print('Главный поток: ${stopwatch.elapsedMilliseconds} мс');
 
   stopwatch.reset();
-  stopwatch.start();
-
-  List<int> isolateNumbers = await Isolate.run(() {
-    List<int> sorted = List.from(numbers);
-    sorted.sort();
-    return sorted;
+  await Isolate.run(() {
+    List<int> copy = List.generate(1000000, (i) => 1000000 - i);
+    copy.sort();
   });
-
-  stopwatch.stop();
-
-  print(
-    "Изолят: ${stopwatch.elapsedMilliseconds} мс",
-  );
+  print('Изолят: ${stopwatch.elapsedMilliseconds} мс');
 }
 
-Future<Float32List> convertAudioSamples(
-  Float32List samples,
-) {
+// 39
+Future<List<double>> convertAudio(List<int> samples) async {
   return Isolate.run(() {
-    return Float32List.fromList(
-      samples.map((sample) => sample / 32768.0).toList(),
-    );
+    return samples.map((sample) => sample / 32768.0).toList();
   });
 }
 
-Future<TransferableTypedData> transferLargeBuffer(
-  TransferableTypedData data,
-) async {
-  return await Isolate.run(() {
-    return data;
+// 40
+Future<int> processData(TransferableTypedData data) async {
+  return Isolate.run(() {
+    Uint8List bytes = data.materialize().asUint8List();
+    return bytes.length;
   });
 }
 ```
@@ -1787,151 +1344,105 @@ Future<TransferableTypedData> transferLargeBuffer(
     - Ограничьте частоту обновления графического экрана до 60 кадров/сек с помощью троттлинга.
     - Реализуйте автоматическое восстановление соединения при обрыве и безопасный вызов `dispose()` для всех контроллеров и подписок.
 
+---
+
+## Решение Блок 5\*
 ```dart
+// Блок 5 — Сложные асинхронные архитектуры и отказоустойчивость (41–50)
 import 'dart:async';
-import 'dart:math';
-import 'dart:collection';
 import 'dart:isolate';
 
-// Блок 5. Сложные асинхронные архитектуры и отказоустойчивость
-
-class CancellationException implements Exception {
-  final String message;
-
-  CancellationException(this.message);
-}
+// 41
+class CancellationException implements Exception {}
 
 class CancelToken {
-  bool _isCancelled = false;
-
-  bool get isCancelled => _isCancelled;
+  bool cancelled = false;
+  Completer<void> completer = Completer<void>();
 
   void cancel() {
-    _isCancelled = true;
+    cancelled = true;
+    completer.complete();
   }
 
-  void throwIfCancelled() {
-    if (_isCancelled) {
-      throw CancellationException("Операция отменена");
-    }
-  }
-}
-
-Future<String> cancellableRequest(CancelToken token) async {
-  for (int i = 0; i < 10; i++) {
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    token.throwIfCancelled();
-  }
-
-  return "Запрос завершен";
-}
-
-class DatabaseChange {
-  final String key;
-  final String value;
-  final DateTime timestamp;
-
-  DatabaseChange(this.key, this.value, this.timestamp);
-}
-
-class DatabaseReplication {
-  final Map<String, DatabaseChange> databaseA = {};
-  final Map<String, DatabaseChange> databaseB = {};
-
-  Future<void> synchronize() async {
-    await Future.wait([
-      _replicate(databaseA, databaseB),
-      _replicate(databaseB, databaseA),
+  Future<T> run<T>(Future<T> operation) {
+    return Future.any([
+      operation,
+      completer.future.then((_) => throw CancellationException()),
     ]);
   }
-
-  Future<void> _replicate(
-    Map<String, DatabaseChange> source,
-    Map<String, DatabaseChange> target,
-  ) async {
-    await Future.delayed(const Duration(milliseconds: 100));
-
-    for (var entry in source.entries) {
-      var existing = target[entry.key];
-
-      if (existing == null ||
-          entry.value.timestamp.isAfter(existing.timestamp)) {
-        target[entry.key] = entry.value;
-      }
-    }
-  }
 }
 
-class OfflineOrderQueue {
-  final Queue<String> _orders = Queue<String>();
+// 42
+class Change {
+  String value;
+  DateTime timestamp;
 
-  bool _isOnline = false;
-  bool _isSending = false;
+  Change(this.value, this.timestamp);
+}
 
-  void addOrder(String order) {
-    _orders.add(order);
-    _processQueue();
-  }
+Future<List<Change>> replicate(List<Change> a, List<Change> b) async {
+  await Future.wait([
+    Future.delayed(Duration(milliseconds: 100)),
+    Future.delayed(Duration(milliseconds: 100)),
+  ]);
 
-  void setOnline(bool online) {
-    _isOnline = online;
-    _processQueue();
-  }
+  Map<String, Change> result = {};
 
-  Future<void> _processQueue() async {
-    if (!_isOnline || _isSending) return;
-
-    _isSending = true;
-
-    try {
-      while (_orders.isNotEmpty && _isOnline) {
-        String order = _orders.first;
-
-        try {
-          await _sendOrder(order);
-          _orders.removeFirst();
-        } catch (e) {
-          break;
-        }
-      }
-    } finally {
-      _isSending = false;
+  for (var change in [...a, ...b]) {
+    if (!result.containsKey(change.value) ||
+        change.timestamp.isAfter(result[change.value]!.timestamp)) {
+      result[change.value] = change;
     }
   }
 
-  Future<void> _sendOrder(String order) async {
-    await Future.delayed(const Duration(seconds: 1));
-    print("Заказ отправлен: $order");
+  return result.values.toList();
+}
+
+// 43
+class OrderQueue {
+  List<String> orders = [];
+  bool online = false;
+  bool sending = false;
+
+  void add(String order) {
+    orders.add(order);
+    send();
+  }
+
+  Future<void> send() async {
+    if (!online || sending) return;
+
+    sending = true;
+
+    while (online && orders.isNotEmpty) {
+      String order = orders.removeAt(0);
+      await Future.delayed(Duration(seconds: 1));
+    }
+
+    sending = false;
   }
 }
 
+// 44
 class CircuitBreaker {
-  int _failures = 0;
-  bool _isOpen = false;
-  DateTime? _openedAt;
+  int errors = 0;
+  bool open = false;
 
-  Future<T> execute<T>(Future<T> Function() request) async {
-    if (_isOpen) {
-      if (DateTime.now().difference(_openedAt!) <
-          const Duration(seconds: 30)) {
-        throw Exception("Circuit Breaker: Разрыв цепи");
-      }
-
-      _isOpen = false;
-      _failures = 0;
-    }
+  Future<void> request(Future<void> Function() task) async {
+    if (open) throw Exception('Разрыв цепи');
 
     try {
-      T result = await request();
-      _failures = 0;
-      return result;
+      await task();
+      errors = 0;
     } catch (e) {
-      _failures++;
+      errors++;
 
-      if (_failures >= 5) {
-        _isOpen = true;
-        _openedAt = DateTime.now();
+      if (errors >= 5) {
+        open = true;
+        Timer(Duration(seconds: 30), () {
+          open = false;
+          errors = 0;
+        });
       }
 
       rethrow;
@@ -1939,274 +1450,171 @@ class CircuitBreaker {
   }
 }
 
-class AsyncSemaphore {
-  final int maxConcurrent;
-  int _active = 0;
+// 45
+class Semaphore {
+  int active = 0;
+  List<Completer<void>> queue = [];
 
-  final Queue<Completer<void>> _waiting = Queue();
-
-  AsyncSemaphore(this.maxConcurrent);
-
-  Future<T> execute<T>(Future<T> Function() task) async {
-    if (_active >= maxConcurrent) {
-      final completer = Completer<void>();
-      _waiting.add(completer);
-      await completer.future;
+  Future<void> acquire() async {
+    if (active >= 3) {
+      Completer<void> c = Completer<void>();
+      queue.add(c);
+      await c.future;
     }
+    active++;
+  }
 
-    _active++;
+  void release() {
+    active--;
+    if (queue.isNotEmpty) queue.removeAt(0).complete();
+  }
 
+  Future<T> run<T>(Future<T> Function() task) async {
+    await acquire();
     try {
       return await task();
     } finally {
-      _active--;
-
-      if (_waiting.isNotEmpty) {
-        _waiting.removeFirst().complete();
-      }
+      release();
     }
   }
 }
 
-class SearchManager {
-  int _requestId = 0;
+// 46
+class Search {
+  int current = 0;
 
-  Future<void> search(
-    String query,
-    void Function(String) onResult,
-  ) async {
-    int currentId = ++_requestId;
-
-    String result = await _serverSearch(query);
-
-    if (currentId == _requestId) {
-      onResult(result);
-    }
-  }
-
-  Future<String> _serverSearch(String query) async {
-    await Future.delayed(
-      Duration(milliseconds: query.length * 300),
+  Future<String?> search(String query) async {
+    int id = ++current;
+    String result = await Future.delayed(
+      Duration(milliseconds: 500),
+      () => query,
     );
-
-    return "Результат поиска: $query";
+    return id == current ? result : null;
   }
 }
 
-class AppLifecycleManager {
-  final List<StreamSubscription<dynamic>> _subscriptions = [];
+// 47
+class Lifecycle {
+  List<StreamSubscription> subscriptions = [];
 
-  void addSubscription(StreamSubscription<dynamic> subscription) {
-    _subscriptions.add(subscription);
+  void add(StreamSubscription subscription) {
+    subscriptions.add(subscription);
   }
 
-  Future<void> onAppPaused() async {
-    for (var subscription in _subscriptions) {
-      await subscription.pause();
+  Future<void> pause() async {
+    for (var sub in subscriptions) {
+      sub.pause();
     }
   }
 
-  void onAppResumed() {
-    for (var subscription in _subscriptions) {
-      subscription.resume();
+  Future<void> resume() async {
+    for (var sub in subscriptions) {
+      sub.resume();
     }
   }
 
   Future<void> dispose() async {
-    for (var subscription in _subscriptions) {
-      await subscription.cancel();
+    for (var sub in subscriptions) {
+      await sub.cancel();
     }
-
-    _subscriptions.clear();
   }
 }
 
-abstract class SyncState {}
-
-class Idle extends SyncState {}
-
-class Syncing extends SyncState {
-  final double progress;
-
-  Syncing(this.progress);
-}
-
-class Success extends SyncState {}
-
-class Error extends SyncState {
-  final Object error;
-
-  Error(this.error);
-}
+// 48
+enum SyncState { idle, syncing, success, error }
 
 class SyncManager {
-  final StreamController<SyncState> _controller =
-      StreamController<SyncState>.broadcast();
+  SyncState state = SyncState.idle;
+  double progress = 0;
 
-  bool _isSyncing = false;
+  Future<void> sync() async {
+    if (state == SyncState.syncing) return;
 
-  Stream<SyncState> get stream => _controller.stream;
-
-  Future<void> synchronize() async {
-    if (_isSyncing) return;
-
-    _isSyncing = true;
-    _controller.add(Syncing(0));
+    state = SyncState.syncing;
 
     try {
       for (int i = 1; i <= 10; i++) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        _controller.add(Syncing(i / 10));
+        await Future.delayed(Duration(milliseconds: 200));
+        progress = i / 10;
       }
-
-      _controller.add(Success());
+      state = SyncState.success;
     } catch (e) {
-      _controller.add(Error(e));
-    } finally {
-      _isSyncing = false;
+      state = SyncState.error;
     }
-  }
-
-  void dispose() {
-    _controller.close();
   }
 }
 
-class MultiLevelCache<T> {
-  final Map<String, T> memoryCache = {};
+// 49
+class Cache {
+  Map<String, String> memory = {};
+  Map<String, String> disk = {};
 
-  final Future<T?> Function(String) readDisk;
-  final Future<void> Function(String, T) writeDisk;
-  final Future<T> Function(String) fetchNetwork;
-
-  MultiLevelCache({
-    required this.readDisk,
-    required this.writeDisk,
-    required this.fetchNetwork,
-  });
-
-  Future<T> get(String key) async {
-    if (memoryCache.containsKey(key)) {
-      return memoryCache[key] as T;
+  Future<String> get(
+    String key,
+    Future<String> Function() network,
+  ) async {
+    if (memory.containsKey(key)) return memory[key]!;
+    if (disk.containsKey(key)) {
+      memory[key] = disk[key]!;
+      return disk[key]!;
     }
 
-    T? diskData = await readDisk(key);
-
-    if (diskData != null) {
-      memoryCache[key] = diskData;
-      return diskData;
-    }
-
-    T networkData = await fetchNetwork(key);
-
-    memoryCache[key] = networkData;
-    await writeDisk(key, networkData);
-
-    return networkData;
+    String value = await network();
+    disk[key] = value;
+    memory[key] = value;
+    return value;
   }
 }
 
+// 50
 class FinancialTerminal {
-  final StreamController<double> _quoteController =
-      StreamController<double>();
+  StreamController<double> controller = StreamController<double>();
+  StreamSubscription<double>? subscription;
+  bool disposed = false;
 
-  final StreamController<double> _screenController =
-      StreamController<double>.broadcast();
-
-  StreamSubscription<double>? _quoteSubscription;
-
-  Timer? _reconnectTimer;
-
-  bool _disposed = false;
-  double _previousPrice = 0;
-
-  Stream<double> get screenStream => _screenController.stream;
-
-  Future<void> connect() async {
-    if (_disposed) return;
-
-    try {
-      _quoteSubscription = _webSocketSimulator().listen(
-        (price) async {
-          if (_disposed) return;
-
-          if (_previousPrice != 0) {
-            double volatility = await Isolate.run(() {
-              return (price - _previousPrice).abs() /
-                  _previousPrice;
-            });
-
-            if (!_disposed) {
-              _screenController.add(volatility);
-            }
-          }
-
-          _previousPrice = price;
-        },
-        onError: (error) {
-          _scheduleReconnect();
-        },
-        onDone: () {
-          _scheduleReconnect();
-        },
-      );
-    } catch (e) {
-      _scheduleReconnect();
-    }
-  }
-
-  Stream<double> _webSocketSimulator() async* {
-    final random = Random();
-    double price = 90000;
-
-    for (int i = 0; i < 100; i++) {
-      if (_disposed) return;
-
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      price += (random.nextDouble() - 0.5) * 1000;
-
-      yield price;
-    }
-  }
-
-  void _scheduleReconnect() {
-    if (_disposed || _reconnectTimer != null) return;
-
-    _reconnectTimer = Timer(
-      const Duration(seconds: 2),
-      () {
-        _reconnectTimer = null;
-        connect();
-      },
-    );
-  }
-
-  Stream<double> throttle60FPS(Stream<double> stream) async* {
-    DateTime? lastUpdate;
-
-    await for (final value in stream) {
-      DateTime now = DateTime.now();
-
-      if (lastUpdate == null ||
-          now.difference(lastUpdate).inMilliseconds >= 16) {
-        lastUpdate = now;
-        yield value;
+  Stream<double> connect() async* {
+    while (!disposed) {
+      try {
+        for (int i = 0; i < 20; i++) {
+          yield 100 + i.toDouble();
+          await Future.delayed(Duration(milliseconds: 10));
+        }
+        throw Exception('Соединение потеряно');
+      } catch (e) {
+        await Future.delayed(Duration(seconds: 1));
       }
     }
+  }
+
+  Future<double> volatility(List<double> prices) async {
+    return Isolate.run(() {
+      double sum = 0;
+      for (int i = 1; i < prices.length; i++) {
+        sum += (prices[i] - prices[i - 1]).abs();
+      }
+      return sum / (prices.length - 1);
+    });
+  }
+
+  Future<void> start() async {
+    List<double> prices = [];
+    Stopwatch stopwatch = Stopwatch()..start();
+
+    subscription = connect().listen((price) async {
+      prices.add(price);
+      if (prices.length > 20) prices.removeAt(0);
+
+      if (prices.length >= 2 && stopwatch.elapsedMilliseconds >= 16) {
+        stopwatch.reset();
+        controller.add(await volatility(prices));
+      }
+    });
   }
 
   Future<void> dispose() async {
-    if (_disposed) return;
-
-    _disposed = true;
-
-    _reconnectTimer?.cancel();
-
-    await _quoteSubscription?.cancel();
-
-    await _quoteController.close();
-    await _screenController.close();
+    disposed = true;
+    await subscription?.cancel();
+    await controller.close();
   }
----
 }
+```
